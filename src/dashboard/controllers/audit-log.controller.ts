@@ -3,6 +3,7 @@ import auditLogService from "../../services/audit-log.service";
 import { AuditAction, AuditEntity } from "../../schemas/audit-log.schema";
 import IJwtUser from "../../types/user";
 import BaseError from "../../utils/base.error";
+import logger from "../../utils/logger";
 import dayjs from "dayjs";
 
 class AuditLogController {
@@ -29,7 +30,7 @@ class AuditLogController {
       if (dateParam) {
         selectedDate = parseUzbekistanDate(dateParam);
         
-        console.log('🔍 Audit Log Query:', {
+        logger.debug('Audit Log Query', {
           dateParam,
           startDate: selectedDate.toISOString(),
           endDate: getUzbekistanDayEnd(dateParam).toISOString(),
@@ -51,7 +52,7 @@ class AuditLogController {
       const minAmount = req.query.minAmount ? parseFloat(req.query.minAmount as string) : undefined;
       const maxAmount = req.query.maxAmount ? parseFloat(req.query.maxAmount as string) : undefined;
       
-      console.log("🔍 Audit Log Filters:", { action, entity, employeeId, search, minAmount, maxAmount });
+      logger.debug("Audit Log Filters", { action, entity, employeeId, search, minAmount, maxAmount });
       
       const activities = await auditLogService.getDailyActivity(
         selectedDate, 
@@ -66,15 +67,10 @@ class AuditLogController {
         }
       );
       
-      console.log("📊 Filtered Result:", {
-        totalLogs: activities.length,
-        filters: { action, entity, employeeId, search, minAmount, maxAmount }
-      });
-      
-      // Debug log - qaytarilgan ma'lumotlar
-      console.log('📊 Audit Log Result:', {
+      logger.debug("Audit Log Result", {
         dateParam,
         foundLogs: activities.length,
+        filters: { action, entity, employeeId, search, minAmount, maxAmount },
         firstLog: activities[0]?.timestamp,
         lastLog: activities[activities.length - 1]?.timestamp,
       });

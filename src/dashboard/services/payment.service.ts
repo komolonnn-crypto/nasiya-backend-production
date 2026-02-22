@@ -740,8 +740,6 @@ class PaymentService {
         paymentId: payment._id,
         contractId: contract._id,
       };
-
-      return payment;
     }); // End of withTransaction
   }
 

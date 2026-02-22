@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Employee from "../schemas/employee.schema";
 import BaseError from "../utils/base.error";
+import logger from "../utils/logger";
 import jwt from "../utils/jwt";
 // import { RoleEnum } from "../enums/role.enum";
 
@@ -25,15 +26,15 @@ export const botManager = async (
       const employee = await Employee.findById(employeeId).populate("role").exec();
       
       if (!employee) {
-        console.log("❌ Mock employee not found:", employeeId);
+        logger.warn("Mock employee not found: " + employeeId);
         return next(BaseError.UnauthorizedError("Mock employee not found"));
       }
 
       const userRole = employee.role?.name;
       const allowedRoles = ["manager", "seller", "admin", "moderator"];
-      
+
       if (!allowedRoles.includes(userRole || "")) {
-        console.log("❌ Mock user role not allowed:", userRole);
+        logger.warn("Mock user role not allowed: " + userRole);
         return next(BaseError.ForbiddenError());
       }
 
@@ -43,8 +44,8 @@ export const botManager = async (
         role: userRole,
         name: `${employee.firstName} ${employee.lastName}`,
       } as any;
-      
-      console.log("🔧 Mock bot auth: Employee authenticated", {
+
+      logger.debug("Mock bot auth: Employee authenticated", {
         id: employee._id,
         role: userRole,
         name: req.user.name,
