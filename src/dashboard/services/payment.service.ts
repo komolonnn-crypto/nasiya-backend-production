@@ -970,18 +970,24 @@ class PaymentService {
       // 3. Qolgan summani tekshirish
       const paymentAmount = payData.amount;
 
-      // ✅ TUZATISH #4: currentRemaining ishlatish (savedRemainingAmount emas)
-      // ✅ YANGI: Ortiqcha to'lashga ruxsat berish
+      // Ortiqcha to'lovni hisoblash: faqat qarzni yopish uchun kerakli summa olinadi,
+      // qolgan ortiqcha summa keyingi oyga (prepaidBalance) o'tkaziladi
       let excessAmount = 0;
       if (paymentAmount > currentRemaining + PAYMENT_CONSTANTS.TOLERANCE) {
         excessAmount = paymentAmount - currentRemaining;
         logger.debug(
-          `💰 Excess payment detected: ${excessAmount.toFixed(2)} $`,
+          `💰 Excess payment detected: ${excessAmount.toFixed(2)} $ → keyingi oyga o'tkaziladi`,
         );
       }
 
       // 4. actualAmount'ni yangilash
-      const newActualAmount = currentActualAmount + paymentAmount;
+      // Agar ortiqcha to'lansa: actualAmount = expectedAmount (faqat qarzni yopadi)
+      // Ortiqcha summa prepaidBalance ga o'tadi — ikki marta hisoblanmaydi
+      // Agar kam to'lansa: actualAmount = currentActualAmount + paymentAmount
+      const newActualAmount = isAmountPositive(excessAmount)
+        ? currentExpectedAmount // Qarzni to'liq yopadi, ortiqcha prepaid ga ketadi
+        : currentActualAmount + paymentAmount; // Hali kam to'langan
+
       const newRemainingAmount = Math.max(
         0,
         currentExpectedAmount - newActualAmount,
@@ -989,30 +995,20 @@ class PaymentService {
 
       existingPayment.actualAmount = newActualAmount;
       existingPayment.remainingAmount = newRemainingAmount;
+      existingPayment.excessAmount = 0; // Ortiqcha prepaid ga o'tadi, paymentda saqlanmaydi
 
-      // ❌ TUZATISH: amount fieldini yangilamaslik kerak!
-      // amount - bu kutilayotgan summa (expectedAmount), o'zgarmasligi kerak
-      // actualAmount - bu haqiqatda to'lanayotgan summa
-      // Kassada actualAmount ko'rsatiladi, shuning uchun amount'ni o'zgartirmaslik kerak
       logger.debug(
-        `✅ Payment amount NOT changed (remains ${existingPayment.amount} $)`,
+        `✅ actualAmount: ${currentActualAmount} + ${paymentAmount} = ${newActualAmount} $ (excess ${excessAmount.toFixed(2)} $ → prepaid)`,
       );
 
-      // ✅ Agar ortiqcha to'lansa, excessAmount'ni saqlash
-      if (isAmountPositive(excessAmount)) {
-        existingPayment.excessAmount = excessAmount;
-        existingPayment.status = PaymentStatus.OVERPAID;
-        logger.debug(
-          `✅ Payment status changed to OVERPAID (excess: ${excessAmount.toFixed(
-            2,
-          )} $)`,
-        );
-      }
       // 5. Status'ni yangilash
-      else if (!isAmountPositive(newRemainingAmount)) {
+      if (isAmountPositive(excessAmount) || !isAmountPositive(newRemainingAmount)) {
+        // Qarz to'liq yopildi (ortiqcha bo'lsa ham, kam bo'lmasa ham)
         existingPayment.status = PaymentStatus.PAID;
         existingPayment.isPaid = true;
-        logger.debug("✅ Payment status changed to PAID");
+        logger.debug(
+          `✅ Payment status changed to PAID (excess ${excessAmount.toFixed(2)} $ → prepaid)`,
+        );
       } else {
         logger.debug(`⚠️ Still UNDERPAID: ${newRemainingAmount} $ remaining`);
       }
