@@ -6,6 +6,7 @@ const router = Router();
 
 router.post("/pay-debt", paymentController.payDebt);
 router.post("/pay-new-debt", paymentController.payNewDebt);
+router.post("/pay-initial", paymentController.payInitialPayment);
 router.post("/pay-all-remaining", paymentController.payAllRemainingMonths);
 router.post("/pay-remaining", paymentController.payRemaining);
 router.get("/my-pending", paymentController.getMyPendingPayments);

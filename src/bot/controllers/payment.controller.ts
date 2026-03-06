@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
-import { PayDebtDto, PayNewDebtDto } from "../../validators/payment";
+import { PayDebtDto, PayInitialDebtDto, PayNewDebtDto } from "../../validators/payment";
 import { handleValidationErrors } from "../../validators/format";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
@@ -77,6 +77,24 @@ class PaymentController {
 
       const data = await paymentService.payRemaining(req.body, user);
       res.status(200).json(data);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async payInitialPayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user;
+      const payData = plainToInstance(PayInitialDebtDto, req.body || {});
+      const errors = await validate(payData);
+      if (errors.length > 0) {
+        const formattedErrors = handleValidationErrors(errors);
+        return next(
+          BaseError.BadRequest("To'lov ma'lumotlari xato.", formattedErrors),
+        );
+      }
+      const data = await paymentService.payInitialPayment(payData, user);
+      res.status(201).json(data);
     } catch (error) {
       return next(error);
     }

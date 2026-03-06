@@ -14,6 +14,7 @@ import Contract, { ContractStatus } from "../../../schemas/contract.schema";
 import { Debtor } from "../../../schemas/debtor.schema";
 import Notes from "../../../schemas/notes.schema";
 import Customer from "../../../schemas/customer.schema";
+import Employee from "../../../schemas/employee.schema";
 import logger from "../../../utils/logger";
 import BaseError from "../../../utils/base.error";
 import IJwtUser from "../../../types/user";
@@ -83,6 +84,37 @@ export class PaymentConfirmationService extends PaymentBaseService {
       payment.confirmedAt = new Date();
       payment.confirmedBy = user.sub as any;
       await payment.save();
+
+      // ✅ INITIAL to'lov tasdiqlanganida — Notes'ga aniq ma'lumot yozish
+      if (payment.paymentType === PaymentType.INITIAL) {
+        try {
+          const confirmer = await Employee.findById(user.sub);
+          const confirmerName =
+            confirmer ?
+              `${confirmer.firstName} ${confirmer.lastName}`.trim()
+            : "Kassa";
+          const now = new Date();
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          const confirmTime = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          const confirmedAmount = payment.actualAmount || payment.amount;
+          const noteText = `Boshlang'ich to'lov to'landi $${confirmedAmount.toLocaleString()} — ${confirmerName} — ${confirmTime}`;
+
+          if (payment.notes) {
+            await Notes.findByIdAndUpdate(payment.notes, { text: noteText });
+          } else {
+            const newNote = await Notes.create({
+              text: noteText,
+              customer: payment.customerId,
+              createBy: user.sub,
+            });
+            payment.notes = newNote._id as any;
+            await payment.save();
+          }
+          logger.debug(`✅ Initial payment notes updated: "${noteText}"`);
+        } catch (e) {
+          logger.warn("⚠️ Could not update initial payment notes:", e);
+        }
+      }
 
       logger.debug("✅ Payment confirmed:", {
         status: payment.status,

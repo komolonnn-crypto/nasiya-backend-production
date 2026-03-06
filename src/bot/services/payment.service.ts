@@ -4,7 +4,7 @@ import IJwtUser from "../../types/user";
 import Payment, { IPayment, PaymentStatus, PaymentType } from "../../schemas/payment.schema";
 import { Debtor } from "../../schemas/debtor.schema";
 import BaseError from "../../utils/base.error";
-import { PayDebtDto, PayNewDebtDto } from "../../validators/payment";
+import { PayDebtDto, PayInitialDebtDto, PayNewDebtDto } from "../../validators/payment";
 import Notes from "../../schemas/notes.schema";
 import { Balance } from "../../schemas/balance.schema";
 import logger from "../../utils/logger";
@@ -291,6 +291,118 @@ class PaymentService {
   }
 
 
+  async payInitialPayment(payData: PayInitialDebtDto, user: IJwtUser) {
+    const Payment = (await import("../../schemas/payment.schema")).default;
+    const { PaymentType, PaymentStatus } = await import("../../schemas/payment.schema");
+
+    const existingContract = await Contract.findOne({
+      _id: payData.id,
+      isDeleted: false,
+      isActive: true,
+    }).populate("payments");
+
+    if (!existingContract) {
+      throw BaseError.NotFoundError("Shartnoma topilmadi yoki o'chirilgan");
+    }
+
+    const allPayments = existingContract.payments as any[];
+
+    // Allaqachon to'langan initial payment bormi?
+    const paidInitial = allPayments.find(
+      (p) => p.paymentType === PaymentType.INITIAL && p.isPaid
+    );
+    if (paidInitial) {
+      throw BaseError.BadRequest("Boshlang'ich to'lov allaqachon to'langan");
+    }
+
+    // PENDING holida kutayotgan initial payment bormi?
+    const pendingInitial = allPayments.find(
+      (p) => p.paymentType === PaymentType.INITIAL && p.status === PaymentStatus.PENDING
+    );
+    if (pendingInitial) {
+      throw BaseError.BadRequest("Boshlang'ich to'lov allaqachon kassa tasdiqlashini kutmoqda");
+    }
+
+    const customer = existingContract.customer;
+    const manager = await Employee.findById(user.sub);
+    if (!manager) {
+      throw BaseError.NotFoundError("Menejer topilmadi");
+    }
+
+    const notes = new Notes({
+      text: payData.notes || "Boshlang'ich to'lov amalga oshirildi",
+      customer,
+      createBy: manager._id,
+    });
+    await notes.save();
+
+    const amountPaid = payData.amount;
+    // Agar admin initialPayment belgilagan bo'lsa, u bo'yicha hisoblash
+    // Aks holda (0 yoki belgilanmagan) — faqat to'langan summani yozamiz
+    const requiredInitialPayment = existingContract.initialPayment || 0;
+    const calculatedExcessAmount = requiredInitialPayment > 0 && amountPaid > requiredInitialPayment
+      ? amountPaid - requiredInitialPayment : 0;
+    const calculatedRemainingAmount = requiredInitialPayment > 0 && amountPaid < requiredInitialPayment
+      ? requiredInitialPayment - amountPaid : 0;
+
+    // SCHEDULED initial payment bormi? (dashboard tomonidan yaratilgan)
+    const existingScheduled = allPayments.find(
+      (p) => p.paymentType === PaymentType.INITIAL &&
+        (p.status === PaymentStatus.SCHEDULED || p.status === null) &&
+        !p.isPaid
+    );
+
+    let paymentDoc;
+
+    if (existingScheduled) {
+      paymentDoc = await Payment.findByIdAndUpdate(
+        existingScheduled._id,
+        {
+          actualAmount: amountPaid,
+          date: new Date(),
+          paymentMethod: payData.paymentMethod,
+          notes: notes._id,
+          managerId: manager._id,
+          status: PaymentStatus.PENDING,
+          excessAmount: calculatedExcessAmount,
+          remainingAmount: calculatedRemainingAmount,
+        },
+        { new: true }
+      );
+    } else {
+      paymentDoc = await Payment.create({
+        amount: amountPaid,
+        actualAmount: amountPaid,
+        date: new Date(),
+        isPaid: false,
+        paymentType: PaymentType.INITIAL,
+        paymentMethod: payData.paymentMethod,
+        notes: notes._id,
+        customerId: customer,
+        managerId: manager._id,
+        status: PaymentStatus.PENDING,
+        expectedAmount: requiredInitialPayment > 0 ? requiredInitialPayment : amountPaid,
+        excessAmount: calculatedExcessAmount,
+        remainingAmount: calculatedRemainingAmount,
+        targetMonth: 0,
+      });
+
+      existingContract.payments.push(paymentDoc._id as any);
+      await existingContract.save();
+    }
+
+    if (!paymentDoc) {
+      throw BaseError.InternalServerError("To'lov yaratishda xatolik yuz berdi");
+    }
+
+    return {
+      status: "success",
+      message: "Boshlang'ich to'lov qabul qilindi, kassa tasdiqlashi kutilmoqda",
+      paymentId: paymentDoc._id,
+      isPending: true,
+    };
+  }
+
   async getMyPendingPayments(user: IJwtUser) {
     try {
 
@@ -322,11 +434,13 @@ class PaymentService {
           remainingAmount: payment.remainingAmount,
           excessAmount: payment.excessAmount,
           status: payment.status,
+          paymentType: payment.paymentType,  // ✅ "initial" | "monthly" | "extra"
+          targetMonth: payment.targetMonth,  // ✅ Qaysi oy (0 = boshlangich)
           createdAt: payment.createdAt,
           customer: {
             _id: customer._id,
             name: customer.fullName,
-            phone: customer.phone,
+            phone: customer.phoneNumber,
           },
           notes: notes?.text || "",
           hoursAgo: payment.createdAt

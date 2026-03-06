@@ -117,3 +117,33 @@ export class ConfirmPaymentsDto {
   @IsNotEmpty({ message: "Payment ID'lar bo'sh bo'lmasligi kerak" })
   paymentIds: string[];
 }
+
+export class PayInitialDebtDto {
+  @IsMongoId({ message: "Contract ID noto'g'ri" })
+  @IsNotEmpty({ message: "Contract ID bo'sh bo'lmasligi kerak" })
+  id: string;
+
+  @IsNumber({}, { message: "To'lov miqdori raqam bo'lishi kerak" })
+  @Min(0.01, { message: "To'lov miqdori musbat bo'lishi kerak" })
+  amount: number;
+
+  @IsString({ message: "Izoh matn bo'lishi kerak" })
+  @IsOptional()
+  notes?: string;
+
+  @IsEnum(PaymentMethod, { message: "To'lov usuli noto'g'ri" })
+  @IsOptional()
+  paymentMethod?: PaymentMethod;
+
+  @ValidateNested()
+  @Type(() => CurrencyDetailsDto)
+  currencyDetails: CurrencyDetailsDto;
+
+  @IsNumber({}, { message: "Dollar kurs raqam bo'lishi kerak" })
+  @Min(0, { message: "Dollar kurs manfiy bo'lmasligi kerak" })
+  currencyCourse: number;
+
+  @IsString({ message: "Izoh matn bo'lishi kerak" })
+  @IsOptional()
+  customerId?: string;
+}
