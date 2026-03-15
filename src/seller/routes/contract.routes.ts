@@ -4,7 +4,6 @@ import { authenticate } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
-// Shartnomalarni ko'rish (authentication kerak)
 router.get("/active", authenticate, contractController.getActiveContracts);
 router.get("/new", authenticate, contractController.getNewContracts);
 router.get(
@@ -14,24 +13,9 @@ router.get(
 );
 
 router.get("/:id", authenticate, contractController.getContractById);
-// router.get(
-//   "/get-contract-by-id/:id",
-//   authenticate,
-//   contractController.getContractById,
-// );
 
-
-
-
-
-
-
-
-
-// Shartnomani tahrirlash (authentication kerak)
 router.put("/:id", authenticate, contractController.updateContract);
 
-// Shartnoma yaratish (authentication kerak)
 router.post("", authenticate, contractController.create);
 router.post("/post", contractController.post);
 

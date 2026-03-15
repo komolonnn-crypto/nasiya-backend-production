@@ -4,26 +4,12 @@ import logger from "../utils/logger";
 import dayjs from "dayjs";
 import * as dotenv from "dotenv";
 
-// Load environment variables
 dotenv.config();
-
-/**
- * Migration: Fix originalPaymentDay field
- * 
- * MUAMMO:
- * - Excel import'da originalPaymentDay noto'g'ri o'rnatilgan
- * - Ba'zi shartnomalar uchun originalPaymentDay null yoki noto'g'ri
- * 
- * YECHIM:
- * - initialPaymentDueDate dan kun olish
- * - Agar initialPaymentDueDate yo'q bo'lsa, nextPaymentDate dan olish
- */
 
 export async function up(): Promise<void> {
   logger.info("🔄 Starting migration: Fix originalPaymentDay");
 
   try {
-    // Barcha shartnomalarni olish
     const contracts = await Contract.find({
       isDeleted: false,
     }).select("_id initialPaymentDueDate nextPaymentDate originalPaymentDay startDate");
@@ -37,27 +23,22 @@ export async function up(): Promise<void> {
       let shouldUpdate = false;
       let newOriginalPaymentDay: number | undefined;
 
-      // 1. Agar originalPaymentDay yo'q bo'lsa
       if (!contract.originalPaymentDay) {
         shouldUpdate = true;
         
-        // initialPaymentDueDate dan kun olish
         if (contract.initialPaymentDueDate) {
           newOriginalPaymentDay = dayjs(contract.initialPaymentDueDate).date();
           logger.debug(`  Contract ${contract._id}: originalPaymentDay null → ${newOriginalPaymentDay} (from initialPaymentDueDate)`);
         } 
-        // Fallback: nextPaymentDate dan
         else if (contract.nextPaymentDate) {
           newOriginalPaymentDay = dayjs(contract.nextPaymentDate).date();
           logger.debug(`  Contract ${contract._id}: originalPaymentDay null → ${newOriginalPaymentDay} (from nextPaymentDate)`);
         }
-        // Fallback: startDate dan
         else if (contract.startDate) {
           newOriginalPaymentDay = dayjs(contract.startDate).date();
           logger.debug(`  Contract ${contract._id}: originalPaymentDay null → ${newOriginalPaymentDay} (from startDate)`);
         }
       }
-      // 2. Agar originalPaymentDay bor, lekin initialPaymentDueDate dan farq qilsa
       else if (contract.initialPaymentDueDate) {
         const correctDay = dayjs(contract.initialPaymentDueDate).date();
         if (contract.originalPaymentDay !== correctDay) {
@@ -93,7 +74,6 @@ export async function down(): Promise<void> {
   logger.info("   Original values were not backed up");
 }
 
-// Run migration if called directly
 if (require.main === module) {
   const MONGO_DB = process.env.MONGO_DB;
   

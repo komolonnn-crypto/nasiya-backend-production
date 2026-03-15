@@ -25,7 +25,6 @@ class ExcelImportController {
         user.sub
       );
 
-      // ✅ Import qilingandan keyin faylni o'chirish
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
@@ -33,7 +32,6 @@ class ExcelImportController {
         }
       } catch (deleteError: any) {
         logger.warn("⚠️ Failed to delete uploaded file:", deleteError.message);
-        // O'chirishda xato bo'lsa, davom etamiz (import muvaffaqiyatli bo'lgani uchun)
       }
 
       res.status(200).json({
@@ -42,7 +40,6 @@ class ExcelImportController {
         data: result,
       });
     } catch (error) {
-      // ❌ Import xato bo'lsa ham, faylni o'chirishga harakat qilamiz
       if (req.file && req.file.path) {
         try {
           if (fs.existsSync(req.file.path)) {

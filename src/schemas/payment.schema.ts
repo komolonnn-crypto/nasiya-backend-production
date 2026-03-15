@@ -7,15 +7,15 @@ export enum PaymentStatus {
   PAID = "PAID",
   UNDERPAID = "UNDERPAID",
   OVERPAID = "OVERPAID",
-  PENDING = "PENDING",       // Kassada tasdiqlash kutilmoqda
-  REJECTED = "REJECTED",     // Rad etilgan to'lov
-  SCHEDULED = "SCHEDULED",   // Rejalashtirilgan to'lov (hali vaqti kelmagan)
+  PENDING = "PENDING",
+  REJECTED = "REJECTED",
+  SCHEDULED = "SCHEDULED",
 }
 
 export enum PaymentType {
-  INITIAL = "initial", // Boshlang'ich to'lov
-  MONTHLY = "monthly", // Oylik to'lov
-  EXTRA = "extra", // Qo'shimcha to'lov
+  INITIAL = "initial",
+  MONTHLY = "monthly",
+  EXTRA = "extra",
 }
 
 export enum PaymentReason {
@@ -26,48 +26,54 @@ export enum PaymentReason {
 }
 
 export enum PaymentMethod {
-  SOM_CASH = "som_cash",           // So'm naqd
-  SOM_CARD = "som_card",           // So'm karta
-  DOLLAR_CASH = "dollar_cash",     // Dollar naqd
-  DOLLAR_CARD_VISA = "dollar_card_visa", // Dollar karta Visa
+  SOM_CASH = "som_cash",
+  SOM_CARD = "som_card",
+  DOLLAR_CASH = "dollar_cash",
+  DOLLAR_CARD_VISA = "dollar_card_visa",
+  FROM_ZAPAS = "from_zapas",
+}
+
+export enum ExcessHandling {
+  NEXT_MONTH = "next_month",
+  ZAPAS = "zapas",
 }
 
 export interface IPayment {
-  amount: number; // Oylik to'lov (expected amount)
-  actualAmount?: number; // ✅ YANGI - Haqiqatda to'langan summa
+  amount: number;
+  actualAmount?: number;
   date: Date;
   isPaid: boolean;
-  paymentType: PaymentType; // YANGI - to'lov turi
-  paymentMethod?: PaymentMethod; // ✅ YANGI - To'lov usuli (so'm naqd, karta, dollar, va h.k.)
+  paymentType: PaymentType;
+  paymentMethod?: PaymentMethod;
   notes: INotes;
   customerId: ICustomer;
   managerId: IEmployee;
-  contractId?: string; // ✅ YANGI - Shartnoma ID (customId)
+  contractId?: string;
   status?: PaymentStatus;
-  remainingAmount?: number; // Kam to'langan bo'lsa
-  excessAmount?: number; // Ko'p to'langan bo'lsa
-  expectedAmount?: number; // Kutilgan summa (oylik to'lov)
-  confirmedAt?: Date; // YANGI - kassa tasdiqlagan vaqt
-  confirmedBy?: IEmployee; // YANGI - kassa xodimi
-  linkedPaymentId?: IPayment | string; // Bog'langan to'lov (qo'shimcha to'lov uchun)
-  reason?: PaymentReason; // Sabab: 'monthly_payment_increase', 'initial_payment_change'
-  prepaidAmount?: number; // Oldindan to'langan summa (keyingi oydan)
-  appliedToPaymentId?: IPayment | string; // Qaysi to'lovga qo'llanildi (ortiqcha summa uchun)
-  targetMonth?: number; // ✅ YANGI - Qaysi oyga to'lov qilinmoqda (1, 2, 3...)
-  nextPaymentDate?: Date; // ✅ YANGI - Kam to'lov bo'lsa, qolgan qismini qachon to'lash kerak
-  reminderDate?: Date; // ✅ YANGI - Manager tomonidan belgilangan eslatma sanasi
-  reminderComment?: string; // ✅ YANGI - Manager eslatma izohi
-  postponedDays?: number; // ✅ YANGI - Kechiktirilgan kunlar soni (kassaga ko'rsatish uchun)
-  isReminderNotification?: boolean; // ✅ YANGI - Bu eslatma notification'imi? (to'lov emas)
-  // ✅ Mongoose timestamps (avtomatik qo'shiladi)
+  remainingAmount?: number;
+  excessAmount?: number;
+  expectedAmount?: number;
+  confirmedAt?: Date;
+  confirmedBy?: IEmployee;
+  linkedPaymentId?: IPayment | string;
+  reason?: PaymentReason;
+  prepaidAmount?: number;
+  appliedToPaymentId?: IPayment | string;
+  targetMonth?: number;
+  nextPaymentDate?: Date;
+  reminderDate?: Date;
+  reminderComment?: string;
+  postponedDays?: number;
+  isReminderNotification?: boolean;
+  excessHandling?: ExcessHandling;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 const PaymentSchema = new Schema<IPayment>(
   {
-    amount: { type: Number, required: true }, // Oylik to'lov
-    actualAmount: { type: Number }, // ✅ YANGI - Haqiqatda to'langan summa
+    amount: { type: Number, required: true },
+    actualAmount: { type: Number },
     date: { type: Date, required: true },
     isPaid: { type: Boolean, required: true, default: false },
     paymentType: {
@@ -96,7 +102,7 @@ const PaymentSchema = new Schema<IPayment>(
       ref: "Employee",
       required: true,
     },
-    contractId: { type: String, required: false }, // ✅ YANGI - Shartnoma ID (customId)
+    contractId: { type: String, required: false },
     status: {
       type: String,
       enum: Object.values(PaymentStatus),
@@ -126,23 +132,24 @@ const PaymentSchema = new Schema<IPayment>(
       ref: "Payment",
       required: false,
     },
-    targetMonth: { type: Number, required: true }, // ✅ YANGI - Qaysi oyga to'lov qilinmoqda (REQUIRED)
-    nextPaymentDate: { type: Date, required: false }, // ✅ YANGI - Kam to'lov bo'lsa, qolgan qismini qachon to'lash kerak
-    reminderDate: { type: Date, required: false }, // ✅ YANGI - Manager tomonidan belgilangan eslatma sanasi
-    reminderComment: { type: String, required: false }, // ✅ YANGI - Manager eslatma izohi
-    postponedDays: { type: Number, required: false }, // ✅ YANGI - Kechiktirilgan kunlar soni
-    isReminderNotification: { type: Boolean, default: false }, // ✅ YANGI - Eslatma notification'i
+    targetMonth: { type: Number, required: true },
+    nextPaymentDate: { type: Date, required: false },
+    reminderDate: { type: Date, required: false },
+    reminderComment: { type: String, required: false },
+    postponedDays: { type: Number, required: false },
+    isReminderNotification: { type: Boolean, default: false },
+    excessHandling: {
+      type: String,
+      enum: Object.values(ExcessHandling),
+      required: false,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Indexes for performance optimization
-// Compound index for pending payments query (isPaid: false, status: PENDING)
 PaymentSchema.index({ isPaid: 1, status: 1 }, { name: "idx_isPaid_status" });
-
-// Index for date-based sorting and queries
 PaymentSchema.index({ date: -1 }, { name: "idx_date" });
 
 const Payment = model<IPayment>("Payment", PaymentSchema);

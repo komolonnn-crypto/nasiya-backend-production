@@ -21,7 +21,6 @@ export async function up(): Promise<void> {
       }
     );
 
-    // List all indexes to verify
     const indexes = await collection.indexes();
     indexes.forEach((index) => {
       console.log(`  - ${index.name}: ${JSON.stringify(index.key)}`);
@@ -55,7 +54,6 @@ export async function down(): Promise<void> {
       }
     }
 
-    // List all indexes to verify
     const indexes = await collection.indexes();
     indexes.forEach((index) => {
       console.log(`  - ${index.name}: ${JSON.stringify(index.key)}`);
@@ -68,7 +66,6 @@ export async function down(): Promise<void> {
 if (require.main === module) {
   const runMigration = async () => {
     try {
-      // Connect to MongoDB
       const mongoUri =
         process.env.MONGO_URI || "mongodb://localhost:27017/your-db";
       await mongoose.connect(mongoUri);
@@ -81,7 +78,6 @@ if (require.main === module) {
         await up();
       }
 
-      // Disconnect
       await mongoose.disconnect();
       console.log(" Disconnected from MongoDB");
       process.exit(0);

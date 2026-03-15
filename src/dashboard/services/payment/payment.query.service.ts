@@ -1,9 +1,4 @@
-/**
- * Payment Query Service
- * 
- * Barcha o'qish operatsiyalari (READ only)
- * Xavfsiz - faqat SELECT query'lar
- */
+
 
 import Payment, { PaymentStatus, PaymentType } from "../../../schemas/payment.schema";
 import Contract from "../../../schemas/contract.schema";
@@ -12,14 +7,7 @@ import logger from "../../../utils/logger";
 import BaseError from "../../../utils/base.error";
 
 export class PaymentQueryService {
-  /**
-   * To'lovlar tarixini olish
-   * Requirements: 7.1, 7.2, C3 - Filter support
-   * 
-   * @param customerId - Mijoz ID
-   * @param contractId - Shartnoma ID
-   * @param filters - Qo'shimcha filterlar (status, paymentType, dateRange)
-   */
+  
   async getPaymentHistory(
     customerId?: string,
     contractId?: string,
@@ -38,28 +26,22 @@ export class PaymentQueryService {
         filters,
       });
 
-      // ✅ C3: Flexible filtering - faqat isPaid emas, status ham
       let matchCondition: any = {};
 
-      // Default: faqat to'langan to'lovlar (agar filter berilmasa)
       if (filters?.isPaid !== undefined) {
         matchCondition.isPaid = filters.isPaid;
       } else if (!filters?.status) {
-        // Agar status filter yo'q bo'lsa, default isPaid: true
         matchCondition.isPaid = true;
       }
 
-      // ✅ C3: Status filter - PENDING, PAID, UNDERPAID, OVERPAID, REJECTED
       if (filters?.status && filters.status.length > 0) {
         matchCondition.status = { $in: filters.status };
       }
 
-      // ✅ C3: Payment type filter - MONTHLY, INITIAL, EXTRA
       if (filters?.paymentType && filters.paymentType.length > 0) {
         matchCondition.paymentType = { $in: filters.paymentType };
       }
 
-      // ✅ C3: Date range filter
       if (filters?.dateFrom || filters?.dateTo) {
         matchCondition.date = {};
         if (filters.dateFrom) {
@@ -145,8 +127,8 @@ export class PaymentQueryService {
             isPaid: 1,
             confirmedAt: 1,
             createdAt: 1,
-            contractId: 1, // ✅ YANGI: Shartnoma ID
-            targetMonth: 1, // ✅ YANGI: Oy raqami
+            contractId: 1,
+            targetMonth: 1,
           },
         },
         { $sort: { date: -1 } },
@@ -165,11 +147,7 @@ export class PaymentQueryService {
     }
   }
 
-  /**
-   * ID bo'yicha to'lovni olish
-   * 
-   * @param paymentId - To'lov ID
-   */
+  
   async getPaymentById(paymentId: string) {
     try {
       const payment = await Payment.findById(paymentId)
@@ -191,11 +169,7 @@ export class PaymentQueryService {
     }
   }
 
-  /**
-   * PENDING to'lovlarni olish (Kassa uchun)
-   * 
-   * @param limit - Limit (default: 100)
-   */
+  
   async getPendingPayments(limit: number = 100) {
     try {
       const payments = await Payment.find({
@@ -219,11 +193,7 @@ export class PaymentQueryService {
     }
   }
 
-  /**
-   * Shartnoma bo'yicha to'lovlarni olish
-   * 
-   * @param contractId - Shartnoma ID
-   */
+  
   async getPaymentsByContract(contractId: string) {
     try {
       const contract = await Contract.findById(contractId);
@@ -250,11 +220,7 @@ export class PaymentQueryService {
     }
   }
 
-  /**
-   * Mijoz bo'yicha barcha to'lovlarni olish
-   * 
-   * @param customerId - Mijoz ID
-   */
+  
   async getPaymentsByCustomer(customerId: string) {
     try {
       const payments = await Payment.find({

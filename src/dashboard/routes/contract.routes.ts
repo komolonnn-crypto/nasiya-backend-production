@@ -21,7 +21,6 @@ router.get(
 
 router.get(
   "/get-all-completed",
-  // checkPermission(Permission.VIEW_CONTRACT),
   contractController.getAllCompleted,
 );
 
@@ -31,7 +30,6 @@ router.get(
   contractController.getContractById,
 );
 
-// Support callers that pass id as a query parameter: /get-contract-by-id?id=...
 router.get(
   "/get-contract-by-id",
   checkPermission(Permission.VIEW_CONTRACT),
@@ -41,7 +39,6 @@ router.get(
       return next(BaseError.BadRequest("Missing contract id"));
     }
 
-    // forward to existing controller by populating params
     req.params.id = id;
     return contractController.getContractById(req, res, next);
   },
@@ -83,11 +80,6 @@ router.delete(
   contractController.deleteContract,
 );
 
-// ========================================
-// 🔥 HARD DELETE CONTRACT (PERMANENT)
-// ONLY: admin, moderator
-// ⚠️ WARNING: This action is IRREVERSIBLE!
-// ========================================
 router.delete(
   "/hard-delete/:id",
   checkPermission(Permission.DELETE_CONTRACT),
@@ -99,11 +91,6 @@ router.delete(
   checkPermission(Permission.DELETE_CONTRACT),
   contractController.bulkHardDeleteContracts,
 );
-
-// ========================================
-// 📅 CONTRACT DATE EDIT ROUTES
-// ONLY: admin, moderator
-// ========================================
 
 router.post(
   "/update-start-date",

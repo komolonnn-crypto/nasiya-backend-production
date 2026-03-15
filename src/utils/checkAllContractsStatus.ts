@@ -1,10 +1,6 @@
 import Contract, { ContractStatus } from "../schemas/contract.schema";
 import logger from "../utils/logger";
 
-/**
- * Barcha shartnomalarning statusini tekshirish va yangilash
- * To'lovlar to'liq to'langan shartnomalarni COMPLETED ga o'tkazish
- */
 export async function checkAllContractsStatus() {
   try {
     logger.debug("🔍 Checking all contracts status...");
@@ -21,18 +17,15 @@ export async function checkAllContractsStatus() {
     for (const contract of contracts) {
       const payments = contract.payments as any[];
 
-      // ✅ actualAmount yoki amount ishlatish (haqiqatda to'langan summa)
       const totalPaid = payments
         .filter((p) => p.isPaid)
         .reduce((sum, p) => sum + (p.actualAmount || p.amount), 0);
 
-      // ✅ Prepaid balance ham qo'shish
       const totalPaidWithPrepaid = totalPaid + (contract.prepaidBalance || 0);
 
       const shouldBeCompleted = totalPaidWithPrepaid >= contract.totalPrice;
       const currentStatus = contract.status;
 
-      // ✅ Status yangilash kerakmi?
       if (shouldBeCompleted && currentStatus !== ContractStatus.COMPLETED) {
         contract.status = ContractStatus.COMPLETED;
         await contract.save();

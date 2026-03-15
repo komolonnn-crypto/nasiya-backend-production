@@ -11,21 +11,12 @@ interface RateLimitStore {
 
 const store: RateLimitStore = {};
 
-/**
- * Simple rate limiting middleware
- * Limits requests per IP address
- *
- * @param maxRequests - Maximum number of requests allowed
- * @param windowMs - Time window in milliseconds
- */
 export const rateLimit = (maxRequests: number, windowMs: number) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Get client IP address
       const ip = req.ip || req.socket.remoteAddress || "unknown";
       const now = Date.now();
 
-      // Initialize or get existing rate limit data
       if (!store[ip] || store[ip].resetTime < now) {
         store[ip] = {
           count: 1,
@@ -34,10 +25,8 @@ export const rateLimit = (maxRequests: number, windowMs: number) => {
         return next();
       }
 
-      // Increment request count
       store[ip].count++;
 
-      // Check if limit exceeded
       if (store[ip].count > maxRequests) {
         const retryAfter = Math.ceil((store[ip].resetTime - now) / 1000);
 
@@ -58,7 +47,6 @@ export const rateLimit = (maxRequests: number, windowMs: number) => {
         );
       }
 
-      // Set rate limit headers
       res.setHeader("X-RateLimit-Limit", maxRequests.toString());
       res.setHeader(
         "X-RateLimit-Remaining",
@@ -77,9 +65,6 @@ export const rateLimit = (maxRequests: number, windowMs: number) => {
   };
 };
 
-/**
- * Cleanup old entries from store periodically
- */
 setInterval(() => {
   const now = Date.now();
   Object.keys(store).forEach((ip) => {
@@ -87,4 +72,4 @@ setInterval(() => {
       delete store[ip];
     }
   });
-}, 60000); // Cleanup every minute
+}, 60000);

@@ -37,8 +37,8 @@ export interface IContractChange {
 
 export interface IContractEdit {
   date: Date;
-  editedBy: IEmployee | string; // Kim tahrirlagan
-  changes: IContractChange[]; // O'zgarishlar
+  editedBy: IEmployee | string;
+  changes: IContractChange[];
   affectedPayments: (IPayment | string)[];
   impactSummary: {
     underpaidCount: number;
@@ -50,14 +50,14 @@ export interface IContractEdit {
 }
 
 export interface IContract extends IBase {
-  customId?: string; // ✅ YANGI: Custom contract ID (26T00001 formatida)
+  customId?: string;
   startDate: Date;
   initialPaymentDueDate?: Date;
   nextPaymentDate: Date;
-  previousPaymentDate?: Date; // Kechiktirilgan eski sana
-  postponedAt?: Date; // Qachon kechiktirilgan
-  originalPaymentDay?: number; // Asl to'lov kuni (1-31) - shartnoma boshlanganidagi kun
-  isPostponedOnce?: boolean; // Faqat bitta oy kechiktirilganmi?
+  previousPaymentDate?: Date;
+  postponedAt?: Date;
+  originalPaymentDay?: number;
+  isPostponedOnce?: boolean;
   customer: ICustomer;
   productName: string;
   originalPrice: number;
@@ -73,9 +73,9 @@ export interface IContract extends IBase {
   isDeclare: boolean;
   status: ContractStatus;
   payments: IPayment[] | string[];
-  prepaidBalance?: number; // Oldindan to'langan balans
-  currency?: "USD" | "UZS"; // ✅ YANGI: Pul birligi (USD yoki UZS)
-  editHistory?: IContractEdit[]; // Tahrirlash tarixi
+  prepaidBalance?: number;
+  currency?: "USD" | "UZS";
+  editHistory?: IContractEdit[];
 }
 
 const ContractChangeSchema = new Schema<IContractChange>(

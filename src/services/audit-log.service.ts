@@ -1,12 +1,13 @@
 import { Types } from "mongoose";
 
-import AuditLog, { AuditAction, AuditEntity, IAuditMetadata } from "../schemas/audit-log.schema";
+import AuditLog, {
+  AuditAction,
+  AuditEntity,
+  IAuditMetadata,
+} from "../schemas/audit-log.schema";
 import logger from "../utils/logger";
 
 class AuditLogService {
-  /**
-   * Audit log yozuv yaratish
-   */
   async createLog(data: {
     action: AuditAction;
     entity: AuditEntity;
@@ -30,7 +31,7 @@ class AuditLogService {
         userId: data.userId,
         userType: data.userType || "employee",
         changesCount: data.changes?.length || 0,
-        hasMetadata: !!data.metadata
+        hasMetadata: !!data.metadata,
       });
 
       const auditLogData = {
@@ -43,29 +44,28 @@ class AuditLogService {
 
       const result = await AuditLog.create(auditLogData);
 
-      logger.debug(`📝 Audit log created successfully: ${data.action} ${data.entity} by ${data.userId}`, {
-        auditLogId: result._id,
-        timestamp: result.timestamp
-      });
+      logger.debug(
+        `📝 Audit log created successfully: ${data.action} ${data.entity} by ${data.userId}`,
+        {
+          auditLogId: result._id,
+          timestamp: result.timestamp,
+        },
+      );
     } catch (error) {
       logger.error("❌ Error creating audit log:", error);
       logger.error("❌ Audit log error details:", {
         message: (error as Error).message,
         stack: (error as Error).stack,
-        inputData: data
+        inputData: data,
       });
-      // Audit log xatosi asosiy jarayonni to'xtatmasligi kerak
     }
   }
 
-  /**
-   * Mijoz yaratish audit log
-   */
   async logCustomerCreate(
     customerId: string,
     customerName: string,
     userId: string,
-    metadata?: { source?: string; fileName?: string }
+    metadata?: { source?: string; fileName?: string },
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.CREATE,
@@ -85,9 +85,6 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Shartnoma yaratish audit log
-   */
   async logContractCreate(
     contractId: string,
     customerId: string,
@@ -95,7 +92,7 @@ class AuditLogService {
     productName: string,
     totalPrice: number,
     userId: string,
-    metadata?: { source?: string; fileName?: string }
+    metadata?: { source?: string; fileName?: string },
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.CREATE,
@@ -104,6 +101,7 @@ class AuditLogService {
       userId,
       metadata: {
         ...metadata,
+        contractId,
         totalPrice,
         affectedEntities: [
           {
@@ -121,9 +119,6 @@ class AuditLogService {
     });
   }
 
-  /**
-   * To'lov yaratish audit log
-   */
   async logPaymentCreate(
     paymentId: string,
     contractId: string,
@@ -136,31 +131,33 @@ class AuditLogService {
     metadata?: {
       source?: string;
       fileName?: string;
-      expectedAmount?: number; // Kutilgan summa
-      actualAmount?: number; // Haqiqatda to'langan
-      paymentStatus?: string; // PAID, UNDERPAID, OVERPAID, etc.
-      remainingAmount?: number; // Qarz
-      excessAmount?: number; // Ortiqcha
-    }
+      expectedAmount?: number;
+      actualAmount?: number;
+      paymentStatus?: string;
+      remainingAmount?: number;
+      excessAmount?: number;
+    },
   ): Promise<void> {
-    // Payment status va summa ma'lumotlarini metadata'ga qo'shish
     const paymentMetadata = {
       ...metadata,
-      amount: metadata?.actualAmount || amount, // Haqiqatda to'langan summa
-      expectedAmount: metadata?.expectedAmount || amount, // Kutilgan summa
+      amount: metadata?.actualAmount || amount,
+      expectedAmount: metadata?.expectedAmount || amount,
       paymentType,
       targetMonth,
+      contractId,
       paymentStatus: metadata?.paymentStatus,
       remainingAmount: metadata?.remainingAmount,
       excessAmount: metadata?.excessAmount,
     };
 
-    // Entity name'da qarz holatini ko'rsatish
     let entityName = `${customerName} - $${metadata?.actualAmount || amount}`;
 
-    if (metadata?.paymentStatus === 'UNDERPAID' && metadata?.remainingAmount) {
+    if (metadata?.paymentStatus === "UNDERPAID" && metadata?.remainingAmount) {
       entityName += ` (${targetMonth}-oy, ${metadata.remainingAmount}$ qarz)`;
-    } else if (metadata?.paymentStatus === 'OVERPAID' && metadata?.excessAmount) {
+    } else if (
+      metadata?.paymentStatus === "OVERPAID" &&
+      metadata?.excessAmount
+    ) {
       entityName += ` (${targetMonth}-oy, +${metadata.excessAmount}$ ortiqcha)`;
     } else {
       entityName += ` (${targetMonth}-oy)`;
@@ -173,7 +170,7 @@ class AuditLogService {
       userId,
       metadata: {
         ...paymentMetadata,
-        customerName, // Mijoz ismini qo'shamiz
+        customerName,
         affectedEntities: [
           {
             entityType: "payment",
@@ -195,9 +192,6 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Xarajatlar (Expenses) yaratish audit log
-   */
   async logExpensesCreate(
     expensesId: string,
     managerId: string,
@@ -205,7 +199,7 @@ class AuditLogService {
     dollar: number,
     sum: number,
     notes: string,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.CREATE,
@@ -233,16 +227,13 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Xarajatlar (Expenses) qaytarish audit log
-   */
   async logExpensesReturn(
     expensesId: string,
     managerId: string,
     managerName: string,
     dollar: number,
     sum: number,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.DELETE,
@@ -264,9 +255,6 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Excel import audit log
-   */
   async logExcelImport(
     fileName: string,
     totalRows: number,
@@ -277,7 +265,7 @@ class AuditLogService {
       entityType: string;
       entityId: string;
       entityName: string;
-    }[]
+    }[],
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.BULK_IMPORT,
@@ -293,14 +281,11 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Mijoz tahrirlash audit log
-   */
   async logCustomerUpdate(
     customerId: string,
     customerName: string,
     changes: { field: string; oldValue: any; newValue: any }[],
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.UPDATE,
@@ -320,16 +305,13 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Shartnoma tahrirlash audit log
-   */
   async logContractUpdate(
     contractId: string,
     customerId: string,
     customerName: string,
     changes: { field: string; oldValue: any; newValue: any }[],
     userId: string,
-    affectedPaymentIds?: string[]
+    affectedPaymentIds?: string[],
   ): Promise<void> {
     const affectedEntities = [
       {
@@ -344,7 +326,6 @@ class AuditLogService {
       },
     ];
 
-    // Affected payments qo'shish
     if (affectedPaymentIds) {
       affectedPaymentIds.forEach((paymentId, index) => {
         affectedEntities.push({
@@ -362,14 +343,12 @@ class AuditLogService {
       userId,
       changes,
       metadata: {
+        contractId,
         affectedEntities,
       },
     });
   }
 
-  /**
-   * To'lov tasdiqlash/rad etish audit log
-   */
   async logPaymentConfirm(
     paymentId: string,
     contractId: string,
@@ -377,7 +356,7 @@ class AuditLogService {
     customerName: string,
     action: "confirm" | "reject",
     amount: number,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: action === "confirm" ? AuditAction.CONFIRM : AuditAction.REJECT,
@@ -386,7 +365,7 @@ class AuditLogService {
       userId,
       metadata: {
         amount,
-        contractId, // ✅ YANGI: Shartnoma ID
+        contractId,
         paymentStatus: action === "confirm" ? "confirmed" : "rejected",
         affectedEntities: [
           {
@@ -409,9 +388,6 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Shartnoma o'chirish audit log
-   */
   async logContractDelete(
     contractId: string,
     customerId: string,
@@ -419,7 +395,7 @@ class AuditLogService {
     productName: string,
     userId: string,
     employeeName?: string,
-    employeeRole?: string
+    employeeRole?: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.DELETE,
@@ -427,6 +403,7 @@ class AuditLogService {
       entityId: contractId,
       userId,
       metadata: {
+        contractId,
         employeeName,
         employeeRole,
         affectedEntities: [
@@ -450,14 +427,11 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Xodim yaratish audit log
-   */
   async logEmployeeCreate(
     employeeId: string,
     employeeName: string,
     role: string,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.CREATE,
@@ -468,21 +442,22 @@ class AuditLogService {
         employeeName,
         employeeRole: role,
         affectedEntities: [
-          { entityType: "employee", entityId: employeeId, entityName: employeeName },
+          {
+            entityType: "employee",
+            entityId: employeeId,
+            entityName: employeeName,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Xodim tahrirlash audit log
-   */
   async logEmployeeUpdate(
     employeeId: string,
     employeeName: string,
     role: string,
     changes: { field: string; oldValue: any; newValue: any }[],
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.UPDATE,
@@ -494,20 +469,21 @@ class AuditLogService {
         employeeName,
         employeeRole: role,
         affectedEntities: [
-          { entityType: "employee", entityId: employeeId, entityName: employeeName },
+          {
+            entityType: "employee",
+            entityId: employeeId,
+            entityName: employeeName,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Xodim o'chirish audit log
-   */
   async logEmployeeDelete(
     employeeId: string,
     employeeName: string,
     role: string,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.DELETE,
@@ -518,19 +494,20 @@ class AuditLogService {
         employeeName,
         employeeRole: role,
         affectedEntities: [
-          { entityType: "employee", entityId: employeeId, entityName: employeeName },
+          {
+            entityType: "employee",
+            entityId: employeeId,
+            entityName: employeeName,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Mijoz o'chirish audit log
-   */
   async logCustomerDelete(
     customerId: string,
     customerName: string,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.DELETE,
@@ -539,15 +516,16 @@ class AuditLogService {
       userId,
       metadata: {
         affectedEntities: [
-          { entityType: "customer", entityId: customerId, entityName: customerName },
+          {
+            entityType: "customer",
+            entityId: customerId,
+            entityName: customerName,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Reset operatsiyasi audit log
-   */
   async logResetAll(userId: string, ipAddress?: string): Promise<void> {
     await this.createLog({
       action: AuditAction.DELETE,
@@ -556,20 +534,21 @@ class AuditLogService {
       ipAddress,
       metadata: {
         affectedEntities: [
-          { entityType: "system", entityId: "reset", entityName: "Barcha ma'lumotlar tozalandi (RESET)" },
+          {
+            entityType: "system",
+            entityId: "reset",
+            entityName: "Barcha ma'lumotlar tozalandi (RESET)",
+          },
         ],
       },
     });
   }
 
-  /**
-   * Login audit log
-   */
   async logLogin(
     userId: string,
     userName: string,
     ipAddress?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.LOGIN,
@@ -589,13 +568,10 @@ class AuditLogService {
     });
   }
 
-  /**
-   * Mijozni tiklash (restoration) audit log
-   */
   async logCustomerRestoration(
     customerId: string,
     customerName: string,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.STATUS_CHANGE,
@@ -604,22 +580,27 @@ class AuditLogService {
       userId,
       metadata: {
         affectedEntities: [
-          { entityType: "customer", entityId: customerId, entityName: customerName },
+          {
+            entityType: "customer",
+            entityId: customerId,
+            entityName: customerName,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Balans o'zgarishi audit log
-   */
   async logBalanceUpdate(
     managerId: string,
     managerName: string,
     dollar: number,
     sum: number,
     userId: string,
-    metadata?: { customerName?: string; contractId?: string; paymentType?: string }
+    metadata?: {
+      customerName?: string;
+      contractId?: string;
+      paymentType?: string;
+    },
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.UPDATE,
@@ -632,20 +613,21 @@ class AuditLogService {
         managerName,
         ...metadata,
         affectedEntities: [
-          { entityType: "employee", entityId: managerId, entityName: managerName },
+          {
+            entityType: "employee",
+            entityId: managerId,
+            entityName: managerName,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Qarzdor yaratish audit log (manual declare)
-   */
   async logDebtorDeclare(
     contractId: string,
     customerName: string,
     debtAmount: number,
-    userId: string
+    userId: string,
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.CREATE,
@@ -653,21 +635,20 @@ class AuditLogService {
       entityId: contractId,
       userId,
       metadata: {
+        contractId,
         amount: debtAmount,
         customerName,
         affectedEntities: [
-          { entityType: "debtor", entityId: contractId, entityName: `${customerName} - $${debtAmount}` },
+          {
+            entityType: "debtor",
+            entityId: contractId,
+            entityName: `${customerName} - $${debtAmount}`,
+          },
         ],
       },
     });
   }
 
-  /**
-   * Kunlik aktiv faoliyat olish (optimized with limit)
-   * 
-   * @param date - Allaqachon UTC formatda kelgan sana (controller'dan parseUzbekistanDate orqali)
-   * @param limit - Maksimal yozuvlar soni
-   */
   async getDailyActivity(
     date?: Date,
     limit: number = 100,
@@ -679,20 +660,18 @@ class AuditLogService {
       minAmount?: number;
       maxAmount?: number;
     },
-    skip: number = 0
+    skip: number = 0,
   ): Promise<{ activities: any[]; total: number }> {
-    // ✅ Query obyektini yaratish
     const query: any = {};
 
-    // Sana filtri — faqat dateParam berilganda qo'llaniladi
     if (date) {
-      const { getUzbekistanDayEnd } = require('../utils/helpers/date.helper');
+      const { getUzbekistanDayEnd } = require("../utils/helpers/date.helper");
 
       const startOfDay = date;
-      const dateObj = new Date(date.getTime() + 5 * 60 * 60 * 1000); // +5 soat
+      const dateObj = new Date(date.getTime() + 5 * 60 * 60 * 1000);
       const year = dateObj.getUTCFullYear();
-      const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getUTCDate()).padStart(2, '0');
+      const month = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(dateObj.getUTCDate()).padStart(2, "0");
       const dateString = `${year}-${month}-${day}`;
       const endOfDay = getUzbekistanDayEnd(dateString);
 
@@ -701,9 +680,7 @@ class AuditLogService {
         $lte: endOfDay,
       };
     }
-    // date berilmasa — hech qanday sana filtri yo'q, barcha yozuvlar qaytariladi
 
-    // ✅ Filterlarni qo'shish
     if (filters) {
       const andFilters: any[] = [];
 
@@ -719,8 +696,8 @@ class AuditLogService {
           andFilters.push({
             $or: [
               { userId: empId },
-              { 'metadata.paymentCreatorId': filters.employeeId }
-            ]
+              { "metadata.paymentCreatorId": filters.employeeId },
+            ],
           });
         } catch (error) {
           console.error("❌ Invalid employeeId format:", filters.employeeId);
@@ -729,16 +706,28 @@ class AuditLogService {
       if (filters.search) {
         andFilters.push({
           $or: [
-            { 'metadata.customerName': { $regex: filters.search, $options: 'i' } },
-            { 'metadata.affectedEntities.entityName': { $regex: filters.search, $options: 'i' } }
-          ]
+            {
+              "metadata.customerName": {
+                $regex: filters.search,
+                $options: "i",
+              },
+            },
+            {
+              "metadata.affectedEntities.entityName": {
+                $regex: filters.search,
+                $options: "i",
+              },
+            },
+          ],
         });
       }
       if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
         const amountQuery: any = {};
-        if (filters.minAmount !== undefined) amountQuery.$gte = filters.minAmount;
-        if (filters.maxAmount !== undefined) amountQuery.$lte = filters.maxAmount;
-        andFilters.push({ 'metadata.amount': amountQuery });
+        if (filters.minAmount !== undefined)
+          amountQuery.$gte = filters.minAmount;
+        if (filters.maxAmount !== undefined)
+          amountQuery.$lte = filters.maxAmount;
+        andFilters.push({ "metadata.amount": amountQuery });
       }
 
       if (andFilters.length > 0) {
@@ -746,10 +735,9 @@ class AuditLogService {
       }
     }
 
-    // ✅ Parallel: activities + total count
     const [activities, total] = await Promise.all([
       AuditLog.find(query)
-        .select('-userAgent -ipAddress')
+        .select("-userAgent -ipAddress")
         .populate("userId", "firstName lastName role")
         .sort({ timestamp: -1 })
         .skip(skip)
@@ -758,18 +746,26 @@ class AuditLogService {
       AuditLog.countDocuments(query),
     ]);
 
-    // ✅ contractId ni metadata dan chiqarish
-    const activitiesWithContractId = activities.map((activity: any) => ({
-      ...activity,
-      contractId: activity.metadata?.contractId || null,
-    }));
+    const activitiesWithContractId = activities.map((activity: any) => {
+      let contractId = activity.metadata?.contractId || null;
+
+      if (!contractId && activity.entity === "contract") {
+        contractId = activity.entityId || null;
+      }
+
+      if (!contractId && activity.metadata?.affectedEntities?.length) {
+        const contractEntity = activity.metadata.affectedEntities.find(
+          (e: any) => e.entityType === "contract",
+        );
+        if (contractEntity) contractId = contractEntity.entityId || null;
+      }
+
+      return { ...activity, contractId };
+    });
 
     return { activities: activitiesWithContractId, total };
   }
 
-  /**
-   * Entity bo'yicha history olish
-   */
   async getEntityHistory(entityType: AuditEntity, entityId: string) {
     const history = await AuditLog.find({
       entity: entityType,
@@ -779,18 +775,22 @@ class AuditLogService {
       .sort({ timestamp: -1 })
       .lean();
 
-    // ✅ YANGI: contractId ni metadata dan chiqarish
-    const historyWithContractId = history.map((item: any) => ({
-      ...item,
-      contractId: item.metadata?.contractId || null,
-    }));
+    const historyWithContractId = history.map((item: any) => {
+      let contractId = item.metadata?.contractId || null;
+      if (!contractId && item.entity === "contract")
+        contractId = item.entityId || null;
+      if (!contractId && item.metadata?.affectedEntities?.length) {
+        const ce = item.metadata.affectedEntities.find(
+          (e: any) => e.entityType === "contract",
+        );
+        if (ce) contractId = ce.entityId || null;
+      }
+      return { ...item, contractId };
+    });
 
     return historyWithContractId;
   }
 
-  /**
-   * User activity olish
-   */
   async getUserActivity(userId: string, limit: number = 50) {
     const activity = await AuditLog.find({
       userId: new Types.ObjectId(userId),
@@ -800,18 +800,22 @@ class AuditLogService {
       .limit(limit)
       .lean();
 
-    // ✅ YANGI: contractId ni metadata dan chiqarish
-    const activityWithContractId = activity.map((item: any) => ({
-      ...item,
-      contractId: item.metadata?.contractId || null,
-    }));
+    const activityWithContractId = activity.map((item: any) => {
+      let contractId = item.metadata?.contractId || null;
+      if (!contractId && item.entity === "contract")
+        contractId = item.entityId || null;
+      if (!contractId && item.metadata?.affectedEntities?.length) {
+        const ce = item.metadata.affectedEntities.find(
+          (e: any) => e.entityType === "contract",
+        );
+        if (ce) contractId = ce.entityId || null;
+      }
+      return { ...item, contractId };
+    });
 
     return activityWithContractId;
   }
 
-  /**
-   * Activity statistics
-   */
   async getActivityStats(startDate: Date, endDate: Date) {
     const stats = await AuditLog.aggregate([
       {

@@ -7,9 +7,7 @@ import IJwtUser from "../../types/user";
 import { Types } from "mongoose";
 
 class CustomerService {
-  // Barcha yangi mijozlarni ko'rish
   async getAllNew(userId: string) {
-    // ✅ TUZATISH: Eng eski shartnoma sanasini olish
     return await Customer.aggregate([
       {
         $match: {
@@ -30,14 +28,13 @@ class CustomerService {
               },
             },
             {
-              $sort: { createdAt: -1 }, // ✅ TUZATISH: Eng YANGI shartnoma birinchi (oxirgi yaratilgan)
+              $sort: { createdAt: -1 },
             },
           ],
         },
       },
       {
         $addFields: {
-          // Eng YANGI (oxirgi) shartnomaning createdAt sanasini olish
           latestContractDate: {
             $ifNull: [
               { $arrayElemAt: ["$contracts.createdAt", 0] },
@@ -63,7 +60,7 @@ class CustomerService {
           isDeleted: 1,
           deletedAt: 1,
           createBy: 1,
-          createdAt: "$latestContractDate", // ✅ Eng YANGI (oxirgi) shartnoma sanasini qaytarish
+          createdAt: "$latestContractDate",
           updatedAt: 1,
         },
       },
@@ -71,7 +68,6 @@ class CustomerService {
     ]);
   }
 
-  // Bitta mijozni ko'rish
   async getOne(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw BaseError.BadRequest("Noto'g'ri mijoz ID.");
@@ -94,7 +90,6 @@ class CustomerService {
     return customer;
   }
 
-  // Mijozni yangilash (seller uchun - menejerni o'zgartira olmaydi)
   async update(id: string, data: CreateCustomerDtoForSeller, files?: any) {
     if (!Types.ObjectId.isValid(id)) {
       throw BaseError.BadRequest("Noto'g'ri mijoz ID.");
@@ -105,7 +100,6 @@ class CustomerService {
       throw BaseError.NotFoundError("Mijoz topilmadi.");
     }
 
-    // Telefon raqamini tekshirish (o'zgargan bo'lsa)
     if (data.phoneNumber && data.phoneNumber !== customer.phoneNumber) {
       const existingPhone = await Customer.findOne({
         phoneNumber: data.phoneNumber,
@@ -118,7 +112,6 @@ class CustomerService {
       }
     }
 
-    // Passport seriyasini tekshirish (o'zgargan bo'lsa)
     if (
       data.passportSeries &&
       data.passportSeries !== customer.passportSeries
@@ -134,7 +127,6 @@ class CustomerService {
       }
     }
 
-    // File paths
     const customerFiles: any = { ...customer.files };
     if (files) {
       if (files.passport && files.passport[0]) {
@@ -148,7 +140,6 @@ class CustomerService {
       }
     }
 
-    // Mijoz ma'lumotlarini yangilash (menejerni o'zgartirmasdan)
     customer.fullName = data.fullName;
     customer.phoneNumber = data.phoneNumber;
     customer.address = data.address;
@@ -192,7 +183,6 @@ class CustomerService {
     const auth = new Auth({});
     await auth.save();
 
-    // File paths
     const customerFiles: any = {};
     if (files) {
       if (files.passport && files.passport[0]) {

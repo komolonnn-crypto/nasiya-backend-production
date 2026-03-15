@@ -2,15 +2,8 @@ import Contract, { ContractStatus } from "../../schemas/contract.schema";
 import Payment from "../../schemas/payment.schema";
 import logger from "../../utils/logger";
 
-/**
- * Contract Helper
- * Shartnoma bilan ishlash uchun yordamchi funksiyalar
- */
 export class ContractHelper {
-  /**
-   * Shartnoma to'liq to'langanini tekshirish
-   * @param contractId - Shartnoma ID
-   */
+  
   static async checkContractCompletion(contractId: string) {
     try {
       const contract = await Contract.findById(contractId).populate("payments");
@@ -19,12 +12,10 @@ export class ContractHelper {
         return;
       }
 
-      // ✅ actualAmount yoki amount ishlatish (haqiqatda to'langan summa)
       const totalPaid = (contract.payments as any[])
         .filter((p) => p.isPaid)
         .reduce((sum, p) => sum + (p.actualAmount || p.amount), 0);
 
-      // ✅ Prepaid balance ham qo'shish
       const totalPaidWithPrepaid = totalPaid + (contract.prepaidBalance || 0);
 
       logger.debug("📊 Contract completion check:", {
@@ -37,7 +28,6 @@ export class ContractHelper {
         currentStatus: contract.status,
       });
 
-      // ✅ Agar to'liq to'langan bo'lsa - COMPLETED
       if (totalPaidWithPrepaid >= contract.totalPrice) {
         if (contract.status !== ContractStatus.COMPLETED) {
           contract.status = ContractStatus.COMPLETED;
@@ -45,7 +35,6 @@ export class ContractHelper {
           logger.debug("✅ Contract status changed to COMPLETED:", contract._id);
         }
       } else {
-        // ✅ Agar to'liq to'lanmagan bo'lsa va COMPLETED bo'lsa - ACTIVE ga qaytarish
         if (contract.status === ContractStatus.COMPLETED) {
           contract.status = ContractStatus.ACTIVE;
           await contract.save();
@@ -61,10 +50,7 @@ export class ContractHelper {
     }
   }
 
-  /**
-   * To'langan oylik to'lovlar sonini hisoblash
-   * @param contractId - Shartnoma ID
-   */
+  
   static async getPaidMonthsCount(contractId: string): Promise<number> {
     try {
       const contract = await Contract.findById(contractId);
@@ -87,14 +73,10 @@ export class ContractHelper {
     }
   }
 
-  /**
-   * Keyingi to'lov sanasini yangilash
-   * @param contract - Shartnoma
-   */
+  
   static updateNextPaymentDate(contract: any): Date {
     const currentDate = new Date(contract.nextPaymentDate || new Date());
 
-    // Kechiktirilgan to'lov bo'lsa, asl sanaga qaytarish
     if (contract.previousPaymentDate && contract.postponedAt) {
       const originalDay =
         contract.originalPaymentDay ||
@@ -109,14 +91,12 @@ export class ContractHelper {
 
       logger.debug("🔄 Kechiktirilgan to'lov to'landi - asl sanaga qaytarildi");
       
-      // Kechiktirilgan ma'lumotlarni tozalash
       contract.previousPaymentDate = undefined;
       contract.postponedAt = undefined;
 
       return nextMonth;
     }
 
-    // ✅ TUZATISH: Hozirgi nextPaymentDate dan keyingi oyni hisoblash (bugungi sanadan emas!)
     const originalDay = contract.originalPaymentDay || currentDate.getDate();
     const nextMonth = new Date(
       currentDate.getFullYear(),

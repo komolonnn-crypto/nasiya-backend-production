@@ -1,16 +1,17 @@
 import "reflect-metadata";
 import app from "./app";
+
 import connectDB from "./config/db";
+import bot from "./bot/main";
+
+import { checkAllContractsStatus } from "./utils/checkAllContractsStatus";
+import createCurrencyCourse from "./utils/createCurrencyCourse";
 import createSuperAdmin from "./utils/createSuperAdmin";
 import seedRoles from "./utils/createRole";
-import startBot from "./bot/startBot";
-import bot from "./bot/main";
-import createCurrencyCourse from "./utils/createCurrencyCourse";
-import debtorService from "./dashboard/services/debtor.service";
-import { checkAllContractsStatus } from "./utils/checkAllContractsStatus";
-import notificationService from "./services/notification.service";
-import backupService from "./services/backup.service";
 import logger from "./utils/logger";
+
+import debtorService from "./dashboard/services/debtor.service";
+import backupService from "./services/backup.service";
 import { startReminderCleanupCron } from "./cron/reminder-cleanup.cron";
 
 const PORT = process.env.PORT || 3000;
@@ -26,10 +27,8 @@ const startServer = async () => {
       logger.debug(`Server is running on port ${PORT}`);
     });
 
-    // ✅ MongoDB backup service'ni ishga tushirish
     backupService.startScheduledBackup();
 
-    // ✅ YANGI: Muddati o'tgan eslatmalarni tozalash cron job
     startReminderCleanupCron();
 
     setInterval(
@@ -41,7 +40,7 @@ const startServer = async () => {
         }
       },
       24 * 60 * 60 * 1000,
-    ); // 24 soat
+    );
 
     setInterval(
       async () => {
@@ -58,17 +57,7 @@ const startServer = async () => {
         }
       },
       60 * 60 * 1000,
-    ); // 1 soat
-
-    // ❌ NOTIFICATION O'CHIRILDI: Faqat eslatma vaqti saqlash kerak
-    // setInterval(async () => {
-    //   try {
-    //     logger.info("🕒 Running scheduled task: Check postponed payment reminders");
-    //     await notificationService.sendPostponeReminders();
-    //   } catch (error) {
-    //     logger.error("Error in postponed payment reminders:", error);
-    //   }
-    // }, 60 * 1000);
+    );
 
     setTimeout(async () => {
       try {
@@ -78,7 +67,6 @@ const startServer = async () => {
       }
     }, 5000);
 
-    // 🔥 MANUAL TRIGGER - 30 soniyadan keyin qayta tekshirish
     setTimeout(async () => {
       try {
         logger.info("🔥 === MANUAL DEBTOR TRIGGER (DEBUG) ===");
@@ -87,7 +75,7 @@ const startServer = async () => {
       } catch (error) {
         logger.error("Error in manual debtor trigger:", error);
       }
-    }, 30000); // 30 soniya
+    }, 30000);
 
     setTimeout(async () => {
       try {
@@ -98,7 +86,6 @@ const startServer = async () => {
       }
     }, 10000);
 
-    // ✅ A6: Dastlabki PENDING to'lovlarni tekshirish (15 soniyadan keyin)
     setTimeout(async () => {
       try {
         logger.info("🕐 Initial check: Expired PENDING payments");
@@ -137,7 +124,6 @@ const startApplication = async () => {
 
     if (shouldStartBot) {
       if (isValidWebhookUrl) {
-        // Production: Use webhook
         logger.debug("Setting up Telegram webhook...");
         try {
           await bot.telegram.deleteWebhook({ drop_pending_updates: true });
@@ -156,12 +142,10 @@ const startApplication = async () => {
           logger.error("Webhook setup failed:", botError.message);
         }
       } else {
-        // Development: Use long polling
         logger.debug("Starting bot in polling mode (development)...");
         try {
           await bot.telegram.deleteWebhook({ drop_pending_updates: true });
 
-          // Start polling in background
           bot
             .launch({
               dropPendingUpdates: true,
@@ -173,7 +157,6 @@ const startApplication = async () => {
               logger.error("Bot polling failed:", err.message);
             });
 
-          // Graceful stop
           process.once("SIGINT", () => bot.stop("SIGINT"));
           process.once("SIGTERM", () => bot.stop("SIGTERM"));
 

@@ -8,7 +8,6 @@ import contractService from "../services/contract.service";
 import logger from "../../utils/logger";
 
 class ContractController {
-  // Faol shartnomalarni olish
   async getActiveContracts(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.sub) {
@@ -22,7 +21,6 @@ class ContractController {
     }
   }
 
-  // Yangi shartnomalarni olish
   async getNewContracts(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.sub) {
@@ -36,7 +34,6 @@ class ContractController {
     }
   }
 
-  // Yopilgan shartnomalarni olish
   async getCompletedContracts(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.sub) {
@@ -52,7 +49,6 @@ class ContractController {
     }
   }
 
-  // Shartnoma detailini olish
   async getContractById(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.sub) {
@@ -67,7 +63,6 @@ class ContractController {
     }
   }
 
-  // Shartnomani tahrirlash
   async updateContract(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.sub) {

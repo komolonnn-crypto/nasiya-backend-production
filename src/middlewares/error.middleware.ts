@@ -13,7 +13,7 @@ const ErrorMiddleware = (
       .json({ 
         message: error.message, 
         errors: error.errors,
-        errorCode: error.errorCode // Frontend uchun error code
+        errorCode: error.errorCode
       });
   }
 

@@ -1,6 +1,4 @@
-/**
- * Balance Helper - Handles balance operations
- */
+
 
 import { Balance } from "../../../schemas/balance.schema";
 import { Types } from "mongoose";
@@ -8,11 +6,7 @@ import { BalanceUpdate } from "./contract.types";
 import logger from "../../../utils/logger";
 
 export class ContractBalanceHelper {
-  /**
-   * Update manager balance
-   * @param managerId - Manager ID
-   * @param changes - Dollar and Sum changes
-   */
+  
   async updateBalance(
     managerId: Types.ObjectId | string,
     changes: BalanceUpdate
@@ -43,11 +37,7 @@ export class ContractBalanceHelper {
     }
   }
 
-  /**
-   * Revert balance changes (for rollback)
-   * @param managerId - Manager ID
-   * @param changes - Dollar and Sum changes to revert
-   */
+  
   async revertBalance(
     managerId: Types.ObjectId | string,
     changes: BalanceUpdate

@@ -3,12 +3,10 @@ import Employee from "../schemas/employee.schema";
 import BaseError from "../utils/base.error";
 import jwt from "../utils/jwt";
 import logger from "../utils/logger";
-// import { RoleEnum } from "../enums/role.enum";
 
 export const checkPermission = (requiredPermission: string) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // const userId = req.user?.sub;
       const auth = req.headers.authorization;
       if (!auth) {
         return next(BaseError.UnauthorizedError());
@@ -31,7 +29,6 @@ export const checkPermission = (requiredPermission: string) => {
 
       const userRole = user.role?.name;
 
-      // Debug logging
       logger.debug("🔍 === PERMISSION CHECK ===");
       logger.debug("👤 User:", user.firstName, user.lastName);
       logger.debug("🎭 Role:", userRole);
@@ -42,11 +39,6 @@ export const checkPermission = (requiredPermission: string) => {
         return next();
       }
 
-      // const rolePermissions =
-      //   (user.role as any)?.permissions?.map((p: any) => p.name) || [];
-      // const userPermissions =
-      //   (user.permissions as any)?.map((p: any) => p.name) || [];
-      // Role permissions - agar role.permissions string[] bo'lsa:
       const rolePermissions: string[] =
         Array.isArray(user.role?.permissions) ?
           user.role!.permissions.map((p: any) =>
@@ -54,7 +46,6 @@ export const checkPermission = (requiredPermission: string) => {
           )
         : [];
 
-      // User permissions - bu ham string[] bo'lishi kerak:
       const userPermissions: string[] =
         Array.isArray(user.permissions) ? user.permissions.map((p) => p) : [];
 

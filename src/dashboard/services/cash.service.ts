@@ -6,12 +6,10 @@ import IJwtUser from "../../types/user";
 import auditLogService from "../../services/audit-log.service";
 
 class CashService {
-
   async getPendingPayments() {
     try {
       logger.log("🔍 === FETCHING PENDING PAYMENTS FOR CASH ===");
 
-      // Debug: Barcha to'lovlarni sanash
       const totalPayments = await Payment.countDocuments();
       const pendingCount = await Payment.countDocuments({
         status: PaymentStatus.PENDING,
@@ -31,7 +29,7 @@ class CashService {
       })
         .populate({
           path: "customerId",
-          select: "fullName phoneNumber", // ✅ manager olib tashlandi - alohida managerId dan olinadi
+          select: "fullName phoneNumber",
         })
         .populate("managerId", "firstName lastName")
         .populate("notes", "text")
@@ -43,7 +41,6 @@ class CashService {
 
       logger.log("✅ Found pending payments for cash:", payments.length);
 
-      // ✅ Har bir payment uchun contractId topish
       const Contract = (await import("../../schemas/contract.schema")).default;
 
       const paymentsWithContract = await Promise.all(
@@ -56,15 +53,14 @@ class CashService {
               .populate("customer", "fullName")
               .lean();
 
-            // Agar Contract.payments da topilmasa, customer ID orqali topish (PENDING to'lovlar uchun)
             if (!contract && payment.customerId) {
               contract = await Contract.findOne({
                 customer: payment.customerId._id || payment.customerId,
-                status: "active", // Faqat faol shartnomalar
+                status: "active",
               })
                 .select("_id customId productName customer initialPaymentDueDate originalPaymentDay startDate")
                 .populate("customer", "fullName")
-                .sort({ createdAt: -1 }) // Eng yangi shartnomani olish
+                .sort({ createdAt: -1 })
                 .lean();
 
               if (contract) {
@@ -84,7 +80,7 @@ class CashService {
 
             return {
               ...payment,
-              contractId: contract?.customId || null, // ✅ YANGI: customId qaytarish
+              contractId: contract?.customId || null,
               initialPaymentDueDate: contract?.initialPaymentDueDate || null,
               originalPaymentDay: contract?.originalPaymentDay || null,
               contractStartDate: contract?.startDate || null,
@@ -132,10 +128,7 @@ class CashService {
     }
   }
 
-  /**
-   * To'lovlarni tasdiqlash
-   * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 4.1, 4.2, 4.3, 4.4, 4.5, 9.3, 9.4
-   */
+  
   async confirmPayments(paymentIds: string[], user: IJwtUser) {
     try {
       logger.log("✅ === CONFIRMING PAYMENTS (CASH) ===");
@@ -155,13 +148,11 @@ class CashService {
       let successCount = 0;
       let errorCount = 0;
 
-      // Har bir payment uchun alohida try-catch qo'shish
       for (const paymentId of paymentIds) {
         try {
           logger.log(`🔄 Processing payment: ${paymentId}`);
           const result = await paymentService.confirmPayment(paymentId, user);
 
-          // Success natijani qaytarish
           results.push({
             paymentId,
             status: "success",
@@ -172,7 +163,6 @@ class CashService {
           successCount++;
           logger.log(`✅ Payment ${paymentId} confirmed successfully`);
         } catch (error) {
-          // Error natijani qaytarish
           logger.error(`❌ Error confirming payment ${paymentId}:`, error);
           logger.error(`❌ Error details:`, {
             message: (error as Error).message,
@@ -224,10 +214,7 @@ class CashService {
     }
   }
 
-  /**
-   * To'lovni rad etish
-   * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 9.5
-   */
+  
   async rejectPayment(paymentId: string, reason: string, user: IJwtUser) {
     try {
       logger.log("❌ === REJECTING PAYMENT (CASH) ===");
@@ -239,7 +226,6 @@ class CashService {
         role: user.role,
       });
 
-      // Validation
       if (!paymentId) {
         logger.warn("⚠️ Payment ID not provided");
         throw BaseError.BadRequest("To'lov ID si kiritilmagan");
@@ -250,7 +236,6 @@ class CashService {
         throw BaseError.BadRequest("Rad etish sababi kiritilmagan");
       }
 
-      // To'lovni rad etish
       const result = await paymentService.rejectPayment(
         paymentId,
         reason,

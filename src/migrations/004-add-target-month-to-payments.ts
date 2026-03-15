@@ -1,8 +1,4 @@
-/**
- * Migration: Add targetMonth to existing payments
- * 
- * Bu migration barcha mavjud to'lovlarga targetMonth fieldini qo'shadi
- */
+
 
 import Payment, { PaymentType } from "../schemas/payment.schema";
 import Contract from "../schemas/contract.schema";
@@ -11,9 +7,8 @@ async function addTargetMonthToPayments() {
   try {
     console.log("🚀 Starting migration: Add targetMonth to payments");
 
-    // Barcha to'lovlarni olish
     const payments = await Payment.find({
-      targetMonth: { $exists: false }, // targetMonth yo'q bo'lgan to'lovlar
+      targetMonth: { $exists: false },
     }).sort({ date: 1 });
 
     console.log(`📊 Found ${payments.length} payments without targetMonth`);
@@ -23,7 +18,6 @@ async function addTargetMonthToPayments() {
 
     for (const payment of payments) {
       try {
-        // Contract topish
         const contract = await Contract.findOne({
           payments: payment._id,
         });
@@ -31,7 +25,6 @@ async function addTargetMonthToPayments() {
         if (!contract) {
           console.warn(`⚠️ Contract not found for payment ${payment._id}`);
           
-          // Contract topilmasa, customer ID orqali qidirish
           const contractByCustomer = await Contract.findOne({
             customer: payment.customerId,
             status: "active",
@@ -43,7 +36,6 @@ async function addTargetMonthToPayments() {
             continue;
           }
 
-          // Contract topildi
           console.log(`✅ Found contract by customer for payment ${payment._id}`);
         }
 
@@ -57,20 +49,17 @@ async function addTargetMonthToPayments() {
           continue;
         }
 
-        // Shartnomadagi barcha to'lovlarni olish
         const allPayments = await Payment.find({
           _id: { $in: activeContract.payments },
           paymentType: PaymentType.MONTHLY,
         }).sort({ date: 1 });
 
-        // Hozirgi to'lovning indexini topish
         const paymentIndex = allPayments.findIndex(
           (p) => p._id.toString() === payment._id.toString()
         );
 
         if (paymentIndex === -1) {
           console.warn(`⚠️ Payment ${payment._id} not found in contract payments`);
-          // Agar topilmasa, sanasi bo'yicha hisoblash
           const contractStartDate = new Date(activeContract.startDate);
           const paymentDate = new Date(payment.date);
           
@@ -80,7 +69,6 @@ async function addTargetMonthToPayments() {
           
           payment.targetMonth = Math.max(1, monthsDiff + 1);
         } else {
-          // Index bo'yicha targetMonth ni aniqlash
           payment.targetMonth = paymentIndex + 1;
         }
 
@@ -109,11 +97,9 @@ async function addTargetMonthToPayments() {
   }
 }
 
-// Agar to'g'ridan-to'g'ri ishga tushirilsa
 if (require.main === module) {
   const mongoose = require("mongoose");
   
-  // MongoDB connection
   const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/nasiya";
   
   mongoose

@@ -1,4 +1,3 @@
-// models/Role.ts
 import { Schema, model, Document } from "mongoose";
 import { Permission } from "../enums/permission.enum";
 import { RoleEnum } from "../enums/role.enum";

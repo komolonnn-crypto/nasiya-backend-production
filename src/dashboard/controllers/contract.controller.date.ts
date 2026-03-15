@@ -6,10 +6,8 @@ import BaseError from "../../utils/base.error";
 import logger from "../../utils/logger";
 
 class ContractDateController {
-
   async updateStartDate(req: Request, res: Response, next: NextFunction) {
     try {
-
       const { contractId, newStartDate, reason } = req.body;
 
       if (!contractId || !newStartDate) {
@@ -37,10 +35,8 @@ class ContractDateController {
     }
   }
 
-
   async previewDateChange(req: Request, res: Response, next: NextFunction) {
     try {
-
       const { contractId, newStartDate } = req.body;
 
       if (!contractId || !newStartDate) {

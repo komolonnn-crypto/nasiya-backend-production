@@ -5,15 +5,15 @@ import { IContract } from "./contract.schema";
 import { PaymentMethod } from "./payment.schema";
 
 export interface IPrepaidRecord {
-  amount: number; // Ortiqcha to'langan summa
-  date: Date; // Qachon olingan
-  paymentMethod?: PaymentMethod; // To'lov usuli (som_cash, som_card, dollar_cash, dollar_card_visa)
-  createdBy: IEmployee; // Kim qo'shgan (manager)
-  customer: ICustomer; // Qaysi mijoz
-  contract: IContract; // Qaysi shartnoma
-  contractId?: string; // Shartnoma customId
-  notes?: string; // Ixtiyoriy izoh
-  relatedPaymentId?: string; // Qaysi to'lovdan olingan
+  amount: number;
+  date: Date;
+  paymentMethod?: PaymentMethod;
+  createdBy: IEmployee;
+  customer: ICustomer;
+  contract: IContract;
+  contractId?: string;
+  notes?: string;
+  relatedPaymentId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -67,7 +67,6 @@ const PrepaidRecordSchema = new Schema<IPrepaidRecord>(
   },
 );
 
-// Indexlar performance uchun
 PrepaidRecordSchema.index(
   { customer: 1, contract: 1 },
   { name: "idx_customer_contract" },

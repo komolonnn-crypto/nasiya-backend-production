@@ -27,26 +27,23 @@ class AuthController {
 
       const data = await authService.login(loginData);
 
-      // Cookie sozlamalari
       const isProduction = process.env.NODE_ENV === "production";
       const isNgrok = req.headers.host?.includes("ngrok");
 
       const cookieOptions: any = {
         httpOnly: true,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 kun
+        maxAge: 30 * 24 * 60 * 60 * 1000,
         path: "/",
-        secure: isProduction || isNgrok, // HTTPS production yoki ngrok'da
-        sameSite: isProduction || isNgrok ? "none" : "lax", // Cross-site production yoki ngrok'da
+        secure: isProduction || isNgrok,
+        sameSite: isProduction || isNgrok ? "none" : "lax",
       };
-
-
 
       res.cookie("refresh_token", data.refreshToken, cookieOptions);
 
       res.json({
         profile: data.profile,
         accessToken: data.accessToken,
-        token: data.accessToken // backward compatibility
+        token: data.accessToken
       });
     } catch (error) {
       return next(error);
@@ -69,10 +66,7 @@ class AuthController {
     try {
       const { refresh_token } = req.cookies;
 
-
-
       if (!refresh_token) {
-
         return next(BaseError.UnauthorizedError("Refresh token topilmadi"));
       }
 

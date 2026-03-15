@@ -1,16 +1,8 @@
-/**
- * Payment Notes Helper
- * 
- * To'lov uchun notes yaratish
- * Kod takrorlanishini bartaraf etish
- */
+
 
 import { PaymentStatus } from "../../../schemas/payment.schema";
 import { PAYMENT_MESSAGES } from "./payment-constants";
 
-/**
- * To'lov uchun notes yaratish
- */
 export const createPaymentNoteText = (params: {
   monthNumber?: number;
   amount: number;
@@ -34,7 +26,6 @@ export const createPaymentNoteText = (params: {
 
   let noteText = customNote || `To'lov: ${amount.toFixed(2)} $`;
 
-  // Oy raqami
   if (monthNumber) {
     noteText = `${monthNumber}-oy to'lovi: ${amount.toFixed(2)} $`;
     if (isFromExcess) {
@@ -42,12 +33,10 @@ export const createPaymentNoteText = (params: {
     }
   }
 
-  // Prepaid balance ishlatilgan
   if (prepaidUsed && prepaidUsed > 0.01) {
     noteText += `\n💎 Prepaid balance ishlatildi: ${prepaidUsed.toFixed(2)} $`;
   }
 
-  // Status ga qarab qo'shimcha ma'lumot
   if (status === PaymentStatus.UNDERPAID && remainingAmount) {
     noteText += `\n⚠️ Kam to'landi: ${remainingAmount.toFixed(2)} $ qoldi`;
   } else if (status === PaymentStatus.OVERPAID && excessAmount) {
@@ -57,9 +46,6 @@ export const createPaymentNoteText = (params: {
   return noteText;
 };
 
-/**
- * Qolgan qarz to'lovi uchun notes
- */
 export const createRemainingPaymentNote = (params: {
   paymentAmount: number;
   customNote?: string;
@@ -75,23 +61,14 @@ export const createRemainingPaymentNote = (params: {
   return noteText;
 };
 
-/**
- * Rad etish uchun notes
- */
 export const createRejectionNote = (reason: string): string => {
   return `\n[RAD ETILDI: ${reason}]`;
 };
 
-/**
- * Avtomatik rad etish uchun notes
- */
 export const createAutoRejectionNote = (timeoutHours: number): string => {
   return `\n\n[AVTOMATIK RAD ETILDI: ${timeoutHours} soat ichida kassa tomonidan tasdiqlanmadi - ${new Date().toLocaleString("uz-UZ")}]`;
 };
 
-/**
- * Barcha oylarni to'lash uchun notes
- */
 export const createPayAllMonthsNote = (params: {
   monthNumber: number;
   amount: number;
@@ -109,9 +86,6 @@ export const createPayAllMonthsNote = (params: {
   return noteText;
 };
 
-/**
- * Response message yaratish
- */
 export const createPaymentResponseMessage = (params: {
   status: PaymentStatus;
   remainingAmount?: number;
@@ -125,7 +99,6 @@ export const createPaymentResponseMessage = (params: {
     return PAYMENT_MESSAGES.PAYMENT_PENDING;
   }
   
-  // Status ga qarab message yaratish
   let message: string = PAYMENT_MESSAGES.PAYMENT_RECEIVED;
   
   if (status === PaymentStatus.UNDERPAID && remainingAmount) {
@@ -134,7 +107,6 @@ export const createPaymentResponseMessage = (params: {
     message = `To'lov qabul qilindi, ${excessAmount.toFixed(2)} $ ortiqcha summa keyingi oyga o'tkazildi`;
   }
   
-  // Prepaid ishlatilgan (message'ga qo'shimcha)
   if (prepaidUsed && prepaidUsed > 0.01) {
     message += `\n💎 Prepaid balance ishlatildi: ${prepaidUsed.toFixed(2)} $`;
   }

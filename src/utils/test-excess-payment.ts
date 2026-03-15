@@ -1,11 +1,4 @@
-/**
- * Test Script: Ortiqcha To'lov
- * 
- * Localhost'da test qilish uchun
- * 
- * Usage:
- *   ts-node src/utils/test-excess-payment.ts
- */
+
 
 import mongoose from "mongoose";
 import Contract, { ContractStatus } from "../schemas/contract.schema";
@@ -16,12 +9,10 @@ import "dotenv/config";
 
 async function createTestData() {
   try {
-    // MongoDB connect
     const mongoUri = process.env.MONGO_DB || "mongodb://localhost:27017/nasiya_db";
     await mongoose.connect(mongoUri);
     console.log("✅ Connected to MongoDB");
 
-    // 1. Test Manager topish yoki yaratish
     let manager = await Employee.findOne({ role: "manager" });
     if (!manager) {
       console.log("❌ Manager topilmadi. Iltimos avval manager yarating.");
@@ -29,7 +20,6 @@ async function createTestData() {
     }
     console.log(`✅ Manager: ${manager.firstName} (${manager._id})`);
 
-    // 2. Test Customer yaratish
     const customer = await Customer.create({
       firstName: "TEST",
       lastName: "ORTIQCHA TO'LOV",
@@ -40,21 +30,20 @@ async function createTestData() {
     });
     console.log(`✅ Customer created: ${customer._id}`);
 
-    // 3. Test Contract yaratish
     const contract = await Contract.create({
       customer: customer._id,
       productName: "TEST MAHSULOT (Ortiqcha to'lov test)",
       productPrice: 1000,
       salePrice: 1200,
       initialPayment: 0,
-      monthlyPayment: 100, // 100$ oyiga
-      period: 12, // 12 oy
-      totalPrice: 1200, // 12 x 100
+      monthlyPayment: 100,
+      period: 12,
+      totalPrice: 1200,
       remainingAmount: 1200,
       status: ContractStatus.ACTIVE,
       managerId: manager._id,
       startDate: new Date(),
-      nextPaymentDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 kun keyin
+      nextPaymentDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       payments: [],
     });
     console.log(`✅ Contract created: ${contract._id}`);
@@ -63,7 +52,6 @@ async function createTestData() {
     console.log(`   Period: ${contract.period} months`);
     console.log(`   Total: ${contract.totalPrice}$`);
 
-    // 4. Birinchi 2 oyni to'langan qilish
     const payment1 = await Payment.create({
       amount: 100,
       actualAmount: 100,
@@ -99,7 +87,6 @@ async function createTestData() {
 
     console.log(`✅ Created 2 paid payments (1-oy, 2-oy)`);
 
-    // 5. Test ma'lumotlarini chiqarish
     console.log("\n" + "=".repeat(60));
     console.log("🎯 TEST DATA TAYYOR!");
     console.log("=".repeat(60));
@@ -146,5 +133,4 @@ async function createTestData() {
   }
 }
 
-// Run
 createTestData();

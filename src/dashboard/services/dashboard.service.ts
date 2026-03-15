@@ -11,10 +11,9 @@ import logger from "../../utils/logger";
 class DashboardService {
   private cache: any = null;
   private cacheTime: number = 0;
-  private CACHE_DURATION = 30000; // 30 soniya
+  private CACHE_DURATION = 30000;
 
   async dashboard() {
-    // Cache tekshirish
     const now = Date.now();
     if (this.cache && now - this.cacheTime < this.CACHE_DURATION) {
       return this.cache;
@@ -27,7 +26,6 @@ class DashboardService {
         Debtor.countDocuments(),
       ]);
 
-    // Valyuta kursini olish
     const currencyCourse = await Currency.findOne().sort({ createdAt: -1 });
     const exchangeRate = currencyCourse?.amount;
     const hasCurrencyRate = !!exchangeRate && exchangeRate > 0;
@@ -54,11 +52,10 @@ class DashboardService {
       sum: 0,
     };
 
-    // Balans (so'm) ni hisoblash: Balans ($) * dollar kursi
     const calculatedBalance = totalBalance || defaultBalance;
     const balanceInSum = hasCurrencyRate
       ? Math.round(calculatedBalance.dollar * exchangeRate!)
-      : 0; // Agar kurs yo'q bo'lsa 0
+      : 0;
 
     const [initialPaymentData] = await Contract.aggregate([
       {
@@ -70,7 +67,6 @@ class DashboardService {
       { $project: { _id: 0, totalInitialPayment: 1 } },
     ]);
 
-    // 2. To'langan summa yig'indisi (faqat to'langanlar)
     const [paidAmountData] = await Payment.aggregate([
       { $match: { isPaid: true } },
       {
@@ -82,7 +78,6 @@ class DashboardService {
       { $project: { _id: 0, totalPaidAmount: 1 } },
     ]);
 
-    // 3. Total contract prices
     const [contractTotalPriceData] = await Contract.aggregate([
       {
         $group: {
@@ -99,7 +94,6 @@ class DashboardService {
 
     const remainingDebt = totalContractPrice - paidAmount;
 
-    // ✅ YANGI: Umumiy zapas (prepaid balance) hisoblash
     const [prepaidBalanceData] = await Contract.aggregate([
       {
         $group: {
@@ -112,7 +106,6 @@ class DashboardService {
 
     const totalPrepaidBalance = prepaidBalanceData?.totalPrepaidBalance || 0;
 
-    // ✅ YANGI: Zapas bo'lgan shartnomalar soni
     const contractsWithPrepaid = await Contract.countDocuments({
       prepaidBalance: { $gt: 0 },
     });
@@ -126,8 +119,8 @@ class DashboardService {
         debtors: debtorCount,
         totalBalance: {
           dollar: calculatedBalance.dollar,
-          sum: balanceInSum, // 0 yoki hisoblangan so'm miqdori
-          hasCurrencyRate, // Kurs mavjudligini bildiradi
+          sum: balanceInSum,
+          hasCurrencyRate,
           currencyRate: exchangeRate || null,
         },
         financial: {
@@ -135,101 +128,18 @@ class DashboardService {
           initialPayment,
           paidAmount,
           remainingDebt,
-          totalPrepaidBalance, // ✅ YANGI: Umumiy zapas
-          contractsWithPrepaid, // ✅ YANGI: Zapas bo'lgan shartnomalar soni
+          totalPrepaidBalance,
+          contractsWithPrepaid,
         },
       },
     };
 
-    // Cache'ga saqlash
     this.cache = result;
     this.cacheTime = Date.now();
 
     return result;
   }
 
-  // async statistic() {
-  //   const now = new Date();
-  //   const startDate = dayjs(now)
-  //     .subtract(11, "month")
-  //     .startOf("month")
-  //     .toDate();
-
-  //   const payments = await Payment.aggregate([
-  //     {
-  //       $match: {
-  //         isPaid: true,
-  //         date: { $gte: startDate },
-  //       },
-  //     },
-  //     {
-  //       $group: {
-  //         _id: {
-  //           year: { $year: "$date" },
-  //           month: { $month: "$date" },
-  //         },
-  //         totalAmount: { $sum: "$amount" },
-  //       },
-  //     },
-  //     {
-  //       $sort: {
-  //         "_id.year": 1,
-  //         "_id.month": 1,
-  //       },
-  //     },
-  //   ]);
-
-  //   // Hozirgi oyning (monthIndex: 0 - Jan, 11 - Dec) nomlarini olish
-  //   const monthNames = [
-  //     "Jan",
-  //     "Feb",
-  //     "Mar",
-  //     "Apr",
-  //     "May",
-  //     "Jun",
-  //     "Jul",
-  //     "Aug",
-  //     "Sep",
-  //     "Oct",
-  //     "Nov",
-  //     "Dec",
-  //   ];
-
-  //   const resultMap = new Map<string, number>();
-  //   const current = dayjs();
-
-  //   // 12 oy bo‘yicha boshlang‘ich 0 qiymatlar bilan map yasash
-  //   for (let i = 11; i >= 0; i--) {
-  //     const date = current.subtract(i, "month");
-  //     const key = `${date.year()}-${date.month() + 1}`; // month is 0-based
-  //     const label = monthNames[date.month()];
-  //     resultMap.set(key, 0);
-  //   }
-
-  //   // Aggregation natijalarini mapga joylash
-  //   for (const item of payments) {
-  //     const key = `${item._id.year}-${item._id.month}`;
-  //     if (resultMap.has(key)) {
-  //       resultMap.set(key, item.totalAmount);
-  //     }
-  //   }
-
-  //   // Final arraylar
-  //   const categories: string[] = [];
-  //   const data: number[] = [];
-
-  //   for (const [key, amount] of resultMap) {
-  //     const [, monthStr] = key.split("-");
-  //     const monthIndex = parseInt(monthStr) - 1;
-  //     categories.push(monthNames[monthIndex]);
-  //     data.push(amount);
-  //   }
-
-  //   return {
-  //     categories,
-  //     series: [...data],
-  //   };
-  // }
   async statistic(range: string) {
     const now = new Date();
     let startDate: Date;
@@ -237,7 +147,6 @@ class DashboardService {
     const formatLabel = (item: any) => "";
 
     if (range === "daily") {
-      // Oxirgi 30 kun
       startDate = dayjs(now).subtract(29, "day").startOf("day").toDate();
       groupBy = {
         year: { $year: "$date" },
@@ -245,13 +154,11 @@ class DashboardService {
         day: { $dayOfMonth: "$date" },
       };
     } else if (range === "yearly") {
-      // Oxirgi 5 yil
       startDate = dayjs(now).subtract(4, "year").startOf("year").toDate();
       groupBy = {
         year: { $year: "$date" },
       };
     } else {
-      // default: monthly
       startDate = dayjs(now).subtract(11, "month").startOf("month").toDate();
       groupBy = {
         year: { $year: "$date" },
@@ -259,7 +166,6 @@ class DashboardService {
       };
     }
 
-    // 1. Payment collection'dan to'lovlarni olish
     const directPayments = await Payment.aggregate([
       {
         $match: {
@@ -279,13 +185,8 @@ class DashboardService {
       },
     ]);
 
-    // 2. ❌ Debtor collection'dan to'lovlarni olish kerak emas
-    // Barcha to'lovlar allaqachon Payment collection'da
-
-    // 3. Barcha to'lovlar faqat Payment collection'dan
     const allPayments = [...directPayments];
 
-    // 4. Bir xil sana bo'yicha to'lovlarni jamlash
     const paymentMap = new Map<string, number>();
 
     for (const payment of allPayments) {
@@ -300,7 +201,6 @@ class DashboardService {
       paymentMap.set(key, currentAmount + payment.totalAmount);
     }
 
-    // 5. Map'ni array'ga aylantirish
     const payments = Array.from(paymentMap.entries())
       .map(([key, totalAmount]) => {
         if (range === "daily") {
@@ -345,19 +245,16 @@ class DashboardService {
       samplePayments: payments.slice(0, 3),
     });
 
-    // Data tayyorlash
     const resultMap = new Map<string, number>();
     const current = dayjs();
 
     if (range === "daily") {
-      // Oxirgi 30 kun uchun label'lar yaratish
       for (let i = 29; i >= 0; i--) {
         const date = current.subtract(i, "day");
-        const label = date.format("DD MMM"); // "01 Nov" formatida
+        const label = date.format("DD MMM");
         resultMap.set(label, 0);
       }
 
-      // To'lovlarni label'larga joylash
       for (const item of payments) {
         const label = dayjs(
           `${item._id.year}-${item._id.month}-${item._id.day}`
@@ -379,7 +276,6 @@ class DashboardService {
         }
       }
     } else {
-      // monthly
       const monthNames = [
         "Jan",
         "Feb",
@@ -421,7 +317,7 @@ class DashboardService {
     });
 
     return {
-      course: currencyCourse?.amount, // Faqat database'dagi kurs
+      course: currencyCourse?.amount,
       message: "success"
     };
   }

@@ -20,7 +20,6 @@ import Notes from "../../schemas/notes.schema";
 
 class CustomerService {
   async getAllCustomer() {
-    // ✅ TUZATISH: Eng eski shartnoma sanasini olish
     return await Customer.aggregate([
       {
         $match: {
@@ -56,19 +55,18 @@ class CustomerService {
             {
               $project: {
                 _id: 1,
-                originalPaymentDay: 1, // ✅ originalPaymentDay ni qo'shish
+                originalPaymentDay: 1,
                 createdAt: 1,
               },
             },
             {
-              $sort: { createdAt: -1 }, // ✅ TUZATISH: Eng YANGI shartnoma birinchi (oxirgi yaratilgan)
+              $sort: { createdAt: -1 },
             },
           ],
         },
       },
       {
         $addFields: {
-          // Eng YANGI (oxirgi) shartnomaning createdAt sanasini olish
           latestContractDate: {
             $ifNull: [
               { $arrayElemAt: ["$contracts.createdAt", 0] },
@@ -93,9 +91,9 @@ class CustomerService {
           isDeleted: 1,
           deletedAt: 1,
           createBy: 1,
-          createdAt: "$latestContractDate", // ✅ Eng YANGI (oxirgi) shartnoma sanasini qaytarish
+          createdAt: "$latestContractDate",
           updatedAt: 1,
-          contracts: 1, // ✅ contracts arrayni qaytarish
+          contracts: 1,
           manager: {
             $cond: {
               if: { $ifNull: ["$manager._id", false] },
@@ -151,12 +149,12 @@ class CustomerService {
             {
               $project: {
                 _id: 1,
-                originalPaymentDay: 1, // ✅ originalPaymentDay ni qo'shish
+                originalPaymentDay: 1,
                 createdAt: 1,
               },
             },
             {
-              $sort: { createdAt: -1 }, // ✅ TUZATISH: Eng YANGI shartnoma birinchi (oxirgi yaratilgan)
+              $sort: { createdAt: -1 },
             },
           ],
         },
@@ -164,7 +162,6 @@ class CustomerService {
       {
         $addFields: {
           contractCount: { $size: "$contracts" },
-          // ✅ TUZATISH: Eng YANGI (oxirgi) shartnomaning createdAt sanasini olish
           latestContractDate: {
             $ifNull: [
               { $arrayElemAt: ["$contracts.createdAt", 0] },
@@ -180,8 +177,8 @@ class CustomerService {
           address: 1,
           passportSeries: 1,
           birthDate: 1,
-          createdAt: "$latestContractDate", // ✅ Eng YANGI (oxirgi) shartnoma sanasini qaytarish
-          contracts: 1, // ✅ contracts arrayni qaytarish
+          createdAt: "$latestContractDate",
+          contracts: 1,
           manager: {
             $ifNull: [
               {
@@ -199,7 +196,6 @@ class CustomerService {
   }
 
   async getAllNew() {
-    // ✅ TUZATISH: Yangi mijozlar uchun ham eng eski shartnoma sanasini olish
     return await Customer.aggregate([
       {
         $match: {
@@ -222,19 +218,18 @@ class CustomerService {
             {
               $project: {
                 _id: 1,
-                originalPaymentDay: 1, // ✅ originalPaymentDay ni qo'shish
+                originalPaymentDay: 1,
                 createdAt: 1,
               },
             },
             {
-              $sort: { createdAt: -1 }, // ✅ TUZATISH: Eng YANGI shartnoma birinchi (oxirgi yaratilgan)
+              $sort: { createdAt: -1 },
             },
           ],
         },
       },
       {
         $addFields: {
-          // Eng YANGI (oxirgi) shartnomaning createdAt sanasini olish
           latestContractDate: {
             $ifNull: [
               { $arrayElemAt: ["$contracts.createdAt", 0] },
@@ -260,9 +255,9 @@ class CustomerService {
           isDeleted: 1,
           deletedAt: 1,
           createBy: 1,
-          createdAt: "$latestContractDate", // ✅ Eng YANGI (oxirgi) shartnoma sanasini qaytarish
+          createdAt: "$latestContractDate",
           updatedAt: 1,
-          contracts: 1, // ✅ contracts arrayni qaytarish (originalPaymentDay bilan)
+          contracts: 1,
         },
       },
       { $sort: { createdAt: -1 } },
@@ -347,10 +342,10 @@ class CustomerService {
                 remainingAmount: 1,
                 excessAmount: 1,
                 expectedAmount: 1,
-                prepaidAmount: 1, // ✅ TUZATILDI: Oldindan to'langan summa
+                prepaidAmount: 1,
                 notes: 1,
-                confirmedAt: 1, // ✅ TUZATILDI: Tasdiqlangan vaqt
-                confirmedBy: 1, // ✅ TUZATILDI: Kim tomonidan tasdiqlangan
+                confirmedAt: 1,
+                confirmedBy: 1,
                 targetMonth: 1,
               },
             },
@@ -378,7 +373,6 @@ class CustomerService {
       },
       {
         $addFields: {
-          // 1. Basic price field safety
           safeInitial: { $ifNull: ["$initialPayment", 0] },
           safeMonthly: { $ifNull: ["$monthlyPayment", 0] },
           safeOriginal: {
@@ -388,7 +382,6 @@ class CustomerService {
             $ifNull: ["$price", { $ifNull: ["$originalPrice", 0] }],
           },
 
-          // 2. Period recovery (treat 0 as missing)
           rawPeriod: {
             $cond: [
               {
@@ -408,7 +401,6 @@ class CustomerService {
       },
       {
         $addFields: {
-          // 3. Derived period if missing
           safePeriod: {
             $convert: {
               input: {
@@ -444,7 +436,6 @@ class CustomerService {
       },
       {
         $addFields: {
-          // 4. Final Total Price (if not present)
           safeTotal: {
             $ifNull: [
               "$totalPrice",
@@ -583,7 +574,6 @@ class CustomerService {
     });
     await customer.save();
 
-    // 🔍 AUDIT LOG: Customer yaratish
     await auditLogService.logCustomerCreate(
       customer._id.toString(),
       data.fullName,
@@ -603,7 +593,6 @@ class CustomerService {
       throw BaseError.NotFoundError("Mijoz topilmadi.");
     }
 
-    // ✅ Tahrirlash tarixini yig'ish
     const changes: any[] = [];
 
     if (data.fullName && data.fullName !== customer.fullName) {
@@ -654,7 +643,6 @@ class CustomerService {
     }
 
     if (data.managerId && data.managerId !== customer.manager?.toString()) {
-      // Manager o'zgarishini to'liq ma'lumot bilan saqlash
       const oldManager = await Employee.findById(customer.manager);
       const newManager = await Employee.findById(data.managerId);
 
@@ -712,7 +700,6 @@ class CustomerService {
       }
     }
 
-    // ✅ Tahrirlash tarixini qo'shish
     const editHistory = customer.editHistory || [];
     if (changes.length > 0 && user) {
       editHistory.push({
@@ -727,7 +714,6 @@ class CustomerService {
         changesCount: changes.length,
       });
 
-      // 🔍 AUDIT LOG: Customer tahrirlash
       await auditLogService.logCustomerUpdate(
         customer._id.toString(),
         customer.fullName,
@@ -907,13 +893,11 @@ class CustomerService {
       logger.debug("🔥 === CUSTOMER HARD DELETE STARTED ===");
       logger.debug(`Customer ID: ${customerId}`);
 
-      // 1. Find customer (including soft deleted ones)
       const customer = await Customer.findById(customerId);
       if (!customer) {
         throw BaseError.NotFoundError("Mijoz topilmadi");
       }
 
-      // 2. Check user role - only Admin and Moderator can hard delete
       const employee = await Employee.findById(user.sub).populate("role");
       const roleName = (employee?.role as any)?.name;
       const canHardDelete = roleName === "admin" || roleName === "moderator";
@@ -928,7 +912,6 @@ class CustomerService {
         );
       }
 
-      // 3. Find all contracts of this customer and delete cascade
       const contracts = await Contract.find({ customer: customerId });
       for (const contract of contracts) {
         await Payment.deleteMany({ contract: contract._id });
@@ -939,7 +922,6 @@ class CustomerService {
         await Contract.findByIdAndDelete(contract._id);
       }
 
-      // 4. Delete customer files from disk
       const { deleteFile } =
         await import("../../middlewares/upload.middleware");
       if (customer.files) {
@@ -948,12 +930,10 @@ class CustomerService {
         if (customer.files.photo) deleteFile(customer.files.photo);
       }
 
-      // 5. Delete customer auth record
       if (customer.auth) {
         await Auth.findByIdAndDelete(customer.auth);
       }
 
-      // 6. Delete customer itself
       await Customer.findByIdAndDelete(customerId);
 
       logger.debug("✅ === CUSTOMER HARD DELETE COMPLETED ===");

@@ -5,7 +5,7 @@ import { BaseSchema, IBase } from "./base.schema";
 
 export interface ICustomerEdit {
   date: Date;
-  editedBy: IEmployee | string; // Kim tahrirlagan
+  editedBy: IEmployee | string;
   changes: {
     field: string;
     oldValue: any;
@@ -21,7 +21,6 @@ export interface ICustomer extends IBase {
   birthDate: Date;
   telegramName: string;
   telegramId: string;
-  // percent: number;
   auth: IAuth;
   manager: IEmployee;
   files?: {
@@ -29,7 +28,7 @@ export interface ICustomer extends IBase {
     shartnoma?: string;
     photo?: string;
   };
-  editHistory?: ICustomerEdit[]; // Tahrirlash tarixi
+  editHistory?: ICustomerEdit[];
 }
 
 const CustomerEditSchema = new Schema<ICustomerEdit>(
@@ -61,7 +60,6 @@ const CustomerSchema = new Schema<ICustomer>(
     birthDate: { type: Date },
     telegramName: { type: String },
     telegramId: { type: String },
-    // percent: { type: Number, default: 30 },
     auth: {
       type: Schema.Types.ObjectId,
       required: true,
@@ -85,7 +83,6 @@ const CustomerSchema = new Schema<ICustomer>(
   }
 );
 
-// Virtual field for contracts
 CustomerSchema.virtual("contracts", {
   ref: "Contract",
   localField: "_id",

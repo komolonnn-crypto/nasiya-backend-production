@@ -47,14 +47,12 @@ class NotificationService {
           paymentInfo = `$${amount.toFixed(2)}`;
         }
 
-        // Status qo'shish
         if (status === "OVERPAID") {
           paymentInfo += " (ko'p to'lov)";
         } else if (status === "UNDERPAID") {
           paymentInfo += " (kam to'lov)";
         }
 
-        // Oy raqami qo'shish
         if (monthNumber) {
           paymentInfo += ` - ${monthNumber}-oy uchun`;
         }
@@ -116,9 +114,7 @@ class NotificationService {
     }
   }
 
-  /**
-   * Get unread notification count
-   */
+  
   async getUnreadCount(managerId: string) {
     try {
       const count = await Notification.countDocuments({
@@ -133,9 +129,7 @@ class NotificationService {
     }
   }
 
-  /**
-   * Mark notification as read
-   */
+  
   async markAsRead(notificationId: string) {
     try {
       await Notification.findByIdAndUpdate(notificationId, {

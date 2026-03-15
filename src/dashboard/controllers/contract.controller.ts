@@ -145,10 +145,7 @@ class ContractController {
     }
   }
 
-  /**
-   * Ta'sir tahlili - shartnoma tahrirlashdan oldin
-   * Requirements: 1.2, 1.3, 1.4, 1.5
-   */
+  
   async analyzeImpact(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -180,9 +177,7 @@ class ContractController {
     }
   }
 
-  /**
-   * O'chirish - shartnomani o'chirish (soft delete)
-   */
+  
   async deleteContract(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;

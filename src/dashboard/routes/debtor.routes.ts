@@ -29,12 +29,6 @@ router.post(
   debtorController.payDebt,
 );
 
-// router.post(
-//   "/notify-debtors",
-//   checkPermission(Permission.UPDATE_DEBTOR),
-//   debtorController.notifyDebtors
-// );
-
 router.get(
   "/customer/:customerId",
   checkPermission(Permission.VIEW_DEBTOR),

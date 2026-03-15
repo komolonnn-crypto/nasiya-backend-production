@@ -1,23 +1,10 @@
-/**
- * Contract Query Service - Handles all database queries and aggregations
- * 
- * Responsibilities:
- * - Get all active contracts
- * - Get all new contracts (not approved)
- * - Get all completed contracts
- * - Get contract by ID with full details
- * 
- * This service is read-only - no mutations
- */
+
 
 import Contract, { ContractStatus } from "../../../schemas/contract.schema";
 import { Types } from "mongoose";
 
 export class ContractQueryService {
-  /**
-   * Get all active contracts with aggregated data
-   * Returns: contracts with customer info, payments, and calculated totals
-   */
+  
   async getAll() {
     return await Contract.aggregate([
       {
@@ -98,8 +85,6 @@ export class ContractQueryService {
                   },
                 },
                 as: "pp",
-                // ✅ TUZATISH: Har doim to'langan summa uchun `actualAmount`ni ishlatish.
-                // `actualAmount` mavjud bo'lmagan eski ma'lumotlar uchun `amount`ga qaytish.
                 in: { $ifNull: ["$$pp.actualAmount", "$$pp.amount"] },
               },
             },
@@ -116,7 +101,7 @@ export class ContractQueryService {
       {
         $project: {
           _id: 1,
-          customId: 1,  // ✅ customId qo'shildi
+          customId: 1,
           productName: 1,
           originalPrice: 1,
           price: 1,
@@ -128,7 +113,7 @@ export class ContractQueryService {
           period: 1,
           startDate: 1,
           nextPaymentDate: 1,
-          originalPaymentDay: 1,  // ✅ originalPaymentDay qo'shildi
+          originalPaymentDay: 1,
           status: 1,
           customer: 1,
           customerName: 1,
@@ -152,10 +137,7 @@ export class ContractQueryService {
     ]);
   }
 
-  /**
-   * Get all new (not approved) contracts
-   * Returns: contracts with customer, seller, and manager info
-   */
+  
   async getAllNewContract() {
     return await Contract.aggregate([
       {
@@ -255,7 +237,7 @@ export class ContractQueryService {
       {
         $project: {
           _id: 1,
-          customId: 1,  // ✅ customId qo'shildi
+          customId: 1,
           productName: 1,
           originalPrice: 1,
           price: 1,
@@ -267,7 +249,7 @@ export class ContractQueryService {
           period: 1,
           startDate: 1,
           nextPaymentDate: 1,
-          originalPaymentDay: 1,  // ✅ originalPaymentDay qo'shildi
+          originalPaymentDay: 1,
           status: 1,
           customer: 1,
           customerName: 1,
@@ -288,10 +270,7 @@ export class ContractQueryService {
     ]);
   }
 
-  /**
-   * Get all completed contracts
-   * Returns: completed contracts with customer info and calculated totals
-   */
+  
   async getAllCompleted() {
     return await Contract.aggregate([
       {
@@ -388,7 +367,7 @@ export class ContractQueryService {
       {
         $project: {
           _id: 1,
-          customId: 1,  // ✅ customId qo'shildi
+          customId: 1,
           productName: 1,
           originalPrice: 1,
           price: 1,
@@ -400,7 +379,7 @@ export class ContractQueryService {
           period: 1,
           startDate: 1,
           nextPaymentDate: 1,
-          originalPaymentDay: 1,  // ✅ originalPaymentDay qo'shildi
+          originalPaymentDay: 1,
           status: 1,
           customer: 1,
           customerName: 1,
@@ -424,19 +403,13 @@ export class ContractQueryService {
     ]);
   }
 
-  /**
-   * Get contract by ID with full details
-   * Returns: contract with customer, manager, payments, notes, and edit history
-   */
+  
   async getContractById(contractId: string) {
-    // ✅ TUZATISH: contractId MongoDB ObjectId yoki customId bo'lishi mumkin
     let matchCondition: any = { isDeleted: false };
     
-    // Agar contractId MongoDB ObjectId formatida bo'lsa (24 ta hex belgi)
     if (/^[0-9a-fA-F]{24}$/.test(contractId)) {
       matchCondition._id = new Types.ObjectId(contractId);
     } else {
-      // Aks holda bu customId (masalan: "26T00001")
       matchCondition.customId = contractId;
     }
     
@@ -552,8 +525,6 @@ export class ContractQueryService {
                   },
                 },
                 as: "pp",
-                // ✅ TUZATISH: Har doim to'langan summa uchun `actualAmount`ni ishlatish.
-                // `actualAmount` mavjud bo'lmagan eski ma'lumotlar uchun `amount`ga qaytish.
                 in: { $ifNull: ["$$pp.actualAmount", "$$pp.amount"] },
               },
             },
@@ -567,7 +538,6 @@ export class ContractQueryService {
           },
         },
       },
-      // Populate editHistory.editedBy
       {
         $lookup: {
           from: "employees",
@@ -618,7 +588,7 @@ export class ContractQueryService {
       {
         $project: {
           _id: 1,
-          customId: 1,  // ✅ customId qo'shildi
+          customId: 1,
           productName: 1,
           originalPrice: 1,
           price: 1,
@@ -632,7 +602,7 @@ export class ContractQueryService {
           startDate: 1,
           endDate: 1,
           nextPaymentDate: 1,
-          originalPaymentDay: 1,  // ✅ originalPaymentDay qo'shildi
+          originalPaymentDay: 1,
           status: 1,
           customer: 1,
           notes: 1,

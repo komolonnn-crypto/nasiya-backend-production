@@ -8,29 +8,22 @@ import logger from "../../utils/logger";
 import dayjs from "dayjs";
 
 class AuditLogController {
-  /**
-   * Kunlik aktivlik olish
-   * GET /api/audit/daily?date=2024-12-10
-   */
+  
   async getDailyActivity(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
 
-      // Faqat admin va moderator ko'ra oladi
       if (!["admin", "moderator"].includes(user.role)) {
         return next(
           BaseError.ForbiddenError("Sizda audit log ko'rish huquqi yo'q"),
         );
       }
 
-      // Date parametrini parse qilish
       const dateParam = req.query.date as string;
 
-      // ✅ TIMEZONE FIX: O'zbekiston vaqt zonasi (UTC+5)
       const { parseUzbekistanDate, getUzbekistanDayEnd } =
         await import("../../utils/helpers/date.helper");
 
-      // date berilmasa — undefined (barcha yozuvlar), berilsa — o'sha kun
       let selectedDate: Date | undefined;
       if (dateParam) {
         selectedDate = parseUzbekistanDate(dateParam);
@@ -41,19 +34,15 @@ class AuditLogController {
           endDate: getUzbekistanDayEnd(dateParam).toISOString(),
         });
       }
-      // else: selectedDate = undefined → barcha yozuvlar, sana filtrisiz
 
-      // Limit parametri (default: 100, max: 500)
       const limitParam =
         req.query.limit ? parseInt(req.query.limit as string) : 100;
       const limit = Math.min(limitParam, 500);
 
-      // Pagination
       const pageParam = req.query.page ? parseInt(req.query.page as string) : 1;
       const page = Math.max(1, pageParam);
       const skip = (page - 1) * limit;
 
-      // ✅ Filter parametrlari
       const action = req.query.action as string | undefined;
       const entity = req.query.entity as string | undefined;
       const employeeId = req.query.employeeId as string | undefined;
@@ -110,10 +99,7 @@ class AuditLogController {
     }
   }
 
-  /**
-   * Activity statistics olish
-   * GET /api/audit/stats?start=2024-12-01&end=2024-12-31
-   */
+  
   async getActivityStats(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -127,7 +113,6 @@ class AuditLogController {
       const startParam = req.query.start as string;
       const endParam = req.query.end as string;
 
-      // Default: oxirgi 30 kun
       const endDate = endParam ? new Date(endParam) : new Date();
       const startDate =
         startParam ?
@@ -156,10 +141,7 @@ class AuditLogController {
     }
   }
 
-  /**
-   * Entity history olish
-   * GET /api/audit/entity/:entityType/:entityId
-   */
+  
   async getEntityHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -172,7 +154,6 @@ class AuditLogController {
 
       const { entityType, entityId } = req.params;
 
-      // Entity type validation
       if (!Object.values(AuditEntity).includes(entityType as AuditEntity)) {
         return next(BaseError.BadRequest("Noto'g'ri entity turi"));
       }
@@ -197,10 +178,7 @@ class AuditLogController {
     }
   }
 
-  /**
-   * User activity olish
-   * GET /api/audit/user/:userId?limit=50
-   */
+  
   async getUserActivity(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -231,10 +209,7 @@ class AuditLogController {
     }
   }
 
-  /**
-   * Filtrlangan aktivlik olish
-   * GET /api/audit/filter?date=2024-12-10&entity=customer&action=CREATE&userId=...
-   */
+  
   async getFilteredActivity(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -261,19 +236,16 @@ class AuditLogController {
         page?: string;
       };
 
-      // Date range
       let startDate: Date | undefined;
       let endDate: Date | undefined;
 
       if (date) {
-        // ✅ TIMEZONE FIX: O'zbekiston vaqt zonasi (UTC+5)
         const { getUzbekistanDayStart, getUzbekistanDayEnd } =
           await import("../../utils/helpers/date.helper");
         startDate = getUzbekistanDayStart(date);
         endDate = getUzbekistanDayEnd(date);
       }
 
-      // Query building
       const query: any = {};
 
       if (startDate && endDate) {
@@ -298,12 +270,10 @@ class AuditLogController {
         query.userId = userId;
       }
 
-      // Pagination
       const limitNum = parseInt(limit);
       const pageNum = parseInt(page);
       const skip = (pageNum - 1) * limitNum;
 
-      // Ma'lumotlarni olish
       const AuditLog = (await import("../../schemas/audit-log.schema")).default;
 
       const [activities, total] = await Promise.all([
@@ -316,7 +286,6 @@ class AuditLogController {
         AuditLog.countDocuments(query),
       ]);
 
-      // ✅ YANGI: contractId ni metadata dan chiqarish
       const activitiesWithContractId = activities.map((activity: any) => ({
         ...activity,
         contractId: activity.metadata?.contractId || null,
@@ -341,10 +310,7 @@ class AuditLogController {
     }
   }
 
-  /**
-   * Dashboard uchun bugungi aktivlik summary
-   * GET /api/audit/today-summary
-   */
+  
   async getTodaySummary(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -359,7 +325,6 @@ class AuditLogController {
       const result = await auditLogService.getDailyActivity(today, 50);
       const activitiesWithContractId = result.activities;
 
-      // Summary statistics
       const summary = {
         totalActivities: activitiesWithContractId.length,
         customers: {

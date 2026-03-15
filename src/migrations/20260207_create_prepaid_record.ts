@@ -1,8 +1,4 @@
-/**
- * Migration: Add PrepaidRecord collection
- * Date: 2026-02-07
- * Description: Create PrepaidRecord schema to store prepaid/excess payment history
- */
+
 
 import { Schema, model } from "mongoose";
 
@@ -36,7 +32,6 @@ const PrepaidRecordSchema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-// Indexlar
 PrepaidRecordSchema.index({ customer: 1, contract: 1 });
 PrepaidRecordSchema.index({ date: -1 });
 PrepaidRecordSchema.index({ createdBy: 1 });
@@ -45,13 +40,11 @@ export default {
   async up() {
     console.log("🔄 Migration: Creating PrepaidRecord collection...");
     const PrepaidRecord = model("PrepaidRecord", PrepaidRecordSchema);
-    // Collection already created by Mongoose schema definition
     console.log("✅ PrepaidRecord collection ready");
   },
 
   async down() {
     console.log("⬇️ Migration: Dropping PrepaidRecord collection...");
-    // Would drop collection if needed
     console.log("✅ PrepaidRecord collection dropped");
   },
 };

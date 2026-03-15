@@ -5,11 +5,9 @@ import { IEmployee } from "./employee.schema";
 export interface IDebtor extends Document {
   contractId: IContract;
   debtAmount: number;
-  dueDate: Date; // YANGI - to'lov muddati
-  overdueDays: number; // YANGI - kechikkan kunlar
+  dueDate: Date;
+  overdueDays: number;
   createBy: IEmployee;
-  // ❌ O'CHIRILDI: payment, currencyDetails, currencyCourse
-  // To'lovlar endi faqat Payment collection'da saqlanadi
 }
 
 const DebtorSchema = new Schema<IDebtor>(
@@ -20,8 +18,8 @@ const DebtorSchema = new Schema<IDebtor>(
       required: true,
     },
     debtAmount: { type: Number, required: true },
-    dueDate: { type: Date, required: true }, // YANGI
-    overdueDays: { type: Number, required: true, default: 0 }, // YANGI
+    dueDate: { type: Date, required: true },
+    overdueDays: { type: Number, required: true, default: 0 },
     createBy: {
       type: Schema.Types.ObjectId,
       ref: "Employee",

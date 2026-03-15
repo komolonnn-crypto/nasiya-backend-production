@@ -114,17 +114,12 @@ export class CreateContractDto extends ContractDto {
   payments?: CreatePaymentItemDto[];
 }
 
-/**
- * Shartnoma tahrirlash uchun DTO
- * ContractDto'dan extends qiladi va qo'shimcha fieldlarni optional qiladi
- */
 export class UpdateContractDto extends ContractDto {
   @IsString({ message: "Id satr bo'lishi kerak" })
   @IsNotEmpty({ message: "Id bo'sh bo'lmasligi kerak" })
   @IsMongoId({ message: "Id noto'g'ri MongoId formatida bo'lishi kerak" })
   id: string;
 
-  // Optional fieldlar - tahrirlashda majburiy emas
   @IsOptional()
   @IsNumber({}, { message: "Foiz raqam bo'lishi kerak" })
   @Min(0, { message: "Foiz manfiy bo'lmasligi kerak" })
@@ -157,10 +152,6 @@ export class UpdateContractDto extends ContractDto {
 
 export class SellerCreateContractDto extends ContractDto {}
 
-/**
- * Shartnoma tahrirlash uchun validatsiya DTO
- * Requirements: 9.1, 9.2, 9.3
- */
 export class ValidateContractEditDto {
   @IsMongoId({ message: "Shartnoma ID noto'g'ri formatda" })
   @IsNotEmpty({ message: "Shartnoma ID bo'sh bo'lmasligi kerak" })

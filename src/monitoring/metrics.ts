@@ -1,8 +1,4 @@
-/**
- * Application Metrics Collection
- *
- * Tracks key metrics for monitoring and alerting
- */
+
 
 interface Metrics {
   contractEdits: {
@@ -57,9 +53,7 @@ class MetricsCollector {
     };
   }
 
-  /**
-   * Record a contract edit
-   */
+  
   recordContractEdit(success: boolean): void {
     this.metrics.contractEdits.total++;
     if (success) {
@@ -70,30 +64,22 @@ class MetricsCollector {
     this.metrics.contractEdits.lastEdit = new Date();
   }
 
-  /**
-   * Record a payment creation
-   */
+  
   recordPaymentCreated(): void {
     this.metrics.payments.created++;
   }
 
-  /**
-   * Record a payment confirmation
-   */
+  
   recordPaymentConfirmed(): void {
     this.metrics.payments.confirmed++;
   }
 
-  /**
-   * Record a payment rejection
-   */
+  
   recordPaymentRejected(): void {
     this.metrics.payments.rejected++;
   }
 
-  /**
-   * Record an error
-   */
+  
   recordError(errorType: string): void {
     this.metrics.errors.count++;
     this.metrics.errors.lastError = new Date();
@@ -102,30 +88,23 @@ class MetricsCollector {
     this.metrics.errors.errorTypes.set(errorType, currentCount + 1);
   }
 
-  /**
-   * Record response time
-   */
+  
   recordResponseTime(timeMs: number): void {
     this.responseTimes.push(timeMs);
 
-    // Keep only last N response times
     if (this.responseTimes.length > this.MAX_RESPONSE_TIMES) {
       this.responseTimes.shift();
     }
 
-    // Calculate average
     const sum = this.responseTimes.reduce((a, b) => a + b, 0);
     this.metrics.performance.avgResponseTime = sum / this.responseTimes.length;
 
-    // Track slow queries (>1000ms)
     if (timeMs > 1000) {
       this.metrics.performance.slowQueries++;
     }
   }
 
-  /**
-   * Get current metrics
-   */
+  
   getMetrics(): Metrics & { errorTypes: Record<string, number> } {
     return {
       ...this.metrics,
@@ -133,9 +112,7 @@ class MetricsCollector {
     };
   }
 
-  /**
-   * Reset metrics
-   */
+  
   reset(): void {
     this.metrics = {
       contractEdits: {
@@ -162,9 +139,7 @@ class MetricsCollector {
     this.responseTimes = [];
   }
 
-  /**
-   * Get metrics summary for logging
-   */
+  
   getSummary(): string {
     const m = this.metrics;
     return `
@@ -183,12 +158,8 @@ Metrics Summary:
   }
 }
 
-// Singleton instance
 export const metricsCollector = new MetricsCollector();
 
-/**
- * Middleware to track response times
- */
 export function metricsMiddleware(req: any, res: any, next: any): void {
   const startTime = Date.now();
 
@@ -200,9 +171,6 @@ export function metricsMiddleware(req: any, res: any, next: any): void {
   next();
 }
 
-/**
- * Get metrics endpoint handler
- */
 export function getMetrics(req: any, res: any): void {
   const metrics = metricsCollector.getMetrics();
   res.json({

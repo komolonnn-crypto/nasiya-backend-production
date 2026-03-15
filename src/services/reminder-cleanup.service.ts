@@ -1,18 +1,10 @@
-/**
- * Reminder Cleanup Service
- * 
- * Muddati o'tgan eslatma notification'larni tozalash
- * Cron job orqali har kuni ishga tushadi
- */
+
 
 import Payment, { PaymentStatus } from "../schemas/payment.schema";
 import logger from "../utils/logger";
 
 class ReminderCleanupService {
-  /**
-   * Muddati o'tgan eslatma notification'larni o'chirish
-   * Har kuni soat 00:00 da ishga tushadi
-   */
+  
   async cleanupExpiredReminders() {
     try {
       logger.info("🧹 === CLEANUP EXPIRED REMINDERS START ===");
@@ -20,10 +12,9 @@ class ReminderCleanupService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Muddati o'tgan eslatmalarni topish
       const expiredReminders = await Payment.find({
         isReminderNotification: true,
-        date: { $lt: today }, // Muddati o'tgan
+        date: { $lt: today },
         isPaid: false,
         status: PaymentStatus.PENDING,
       });
@@ -39,7 +30,6 @@ class ReminderCleanupService {
         };
       }
       
-      // Eslatmalarni o'chirish
       const result = await Payment.deleteMany({
         isReminderNotification: true,
         date: { $lt: today },
@@ -61,9 +51,7 @@ class ReminderCleanupService {
     }
   }
 
-  /**
-   * Statistika - nechta eslatma muddati o'tgan
-   */
+  
   async getExpiredRemindersStats() {
     try {
       const today = new Date();
