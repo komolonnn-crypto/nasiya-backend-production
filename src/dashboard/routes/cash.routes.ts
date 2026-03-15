@@ -6,13 +6,8 @@ import cashController from "../controllers/cash.controller";
 
 const router = Router();
 
-// Rate limiting: 100 requests per minute
 const cashRateLimit = rateLimit(100, 60 * 1000);
 
-/**
- * DEPRECATED: Eski route'lar
- * Yangi route'lardan foydalaning
- */
 router.get(
   "/get-all",
   cashRateLimit,
@@ -27,12 +22,6 @@ router.put(
   cashController.confirmations
 );
 
-/**
- * Yangi route'lar
- * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
- */
-
-// Pending to'lovlarni olish
 router.get(
   "/pending",
   cashRateLimit,
@@ -40,7 +29,6 @@ router.get(
   cashController.getPendingPayments
 );
 
-// To'lovlarni tasdiqlash
 router.post(
   "/confirm-payments",
   cashRateLimit,
@@ -48,7 +36,6 @@ router.post(
   cashController.confirmPayments
 );
 
-// To'lovni rad etish
 router.post(
   "/reject-payment",
   cashRateLimit,

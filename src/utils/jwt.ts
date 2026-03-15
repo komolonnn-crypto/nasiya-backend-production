@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 import IJwtUser from "../types/user";
-// import IJwtRegisterKey from "../types/registerKey";
 
 class Jwt {
   private accessTokenSecret: string;

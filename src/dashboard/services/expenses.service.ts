@@ -46,7 +46,7 @@ class ExpensesSrvice {
         },
         {
           $sort: {
-            createdAt: -1, // So‘nggi xarajatlar birinchi
+            createdAt: -1,
           },
         },
         { $skip: skip },
@@ -97,7 +97,6 @@ class ExpensesSrvice {
       throw BaseError.BadRequest("Xarajat allaqachon qaytarilgan");
     }
 
-    // Balance'ga qaytarish (xarajat bekor qilinganda)
     const balance = await Balance.findOne({
       managerId: existingExpenses.managerId,
     });
@@ -120,7 +119,6 @@ class ExpensesSrvice {
     existingExpenses.isActive = false;
     await existingExpenses.save();
 
-    // Audit log
     if (user) {
       const manager = existingExpenses.managerId as IEmployee;
       const managerName = `${manager.firstName} ${manager.lastName}`;

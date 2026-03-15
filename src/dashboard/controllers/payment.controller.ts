@@ -72,9 +72,7 @@ class PaymentController {
     }
   }
 
-  /**
-   * Qolgan qarzni to'lash (mavjud to'lovga qo'shimcha)
-   */
+  
   async payRemaining(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user;
@@ -87,7 +85,6 @@ class PaymentController {
         paymentMethod,
       } = req.body;
 
-      // Validation
       if (!paymentId) {
         return next(BaseError.BadRequest("Payment ID kiritilmagan"));
       }
@@ -156,7 +153,6 @@ class PaymentController {
         );
       }
 
-      // Batafsil validatsiya
       const validationErrors = [];
 
       if (!contractId) validationErrors.push("contractId yo'q");
@@ -205,8 +201,6 @@ class PaymentController {
       return next(error);
     }
   }
-
-  // Yangi endpoint'lar - Payment Service uchun
 
   async receivePayment(req: Request, res: Response, next: NextFunction) {
     try {
@@ -275,7 +269,6 @@ class PaymentController {
         paymentMethod,
       } = req.body;
 
-      // Agar user yo'q bo'lsa
       if (!user) {
         logger.error("❌ User not found in request");
         return next(
@@ -285,7 +278,6 @@ class PaymentController {
         );
       }
 
-      // Batafsil validatsiya
       const validationErrors = [];
 
       if (!contractId) validationErrors.push("contractId yo'q");

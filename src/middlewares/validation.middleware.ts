@@ -4,14 +4,6 @@ import { validate, ValidationError } from "class-validator";
 import { handleValidationErrors } from "../validators/format";
 import BaseError from "../utils/base.error";
 
-/**
- * Generic validation middleware factory
- * Requirements: 9.1, 9.2, 9.3
- *
- * @param dtoClass - DTO class to validate against
- * @param source - Where to get data from ('body', 'params', 'query')
- * @returns Express middleware function
- */
 export function validateDto<T extends object>(
   dtoClass: ClassConstructor<T>,
   source: "body" | "params" | "query" = "body"
@@ -32,7 +24,6 @@ export function validateDto<T extends object>(
         );
       }
 
-      // Attach validated data to request for use in controller
       req.validatedData = dtoInstance;
       next();
     } catch (error) {
@@ -41,12 +32,6 @@ export function validateDto<T extends object>(
   };
 }
 
-/**
- * Contract edit validation middleware
- * Requirements: 9.1, 9.2, 9.3
- *
- * Validates contract edit requests with additional business logic checks
- */
 export async function validateContractEditRequest(
   req: Request,
   res: Response,
@@ -55,7 +40,6 @@ export async function validateContractEditRequest(
   try {
     const { monthlyPayment, initialPayment, totalPrice } = req.body;
 
-    // Basic type validation
     if (monthlyPayment !== undefined) {
       if (typeof monthlyPayment !== "number" || monthlyPayment < 0) {
         return next(
@@ -82,7 +66,6 @@ export async function validateContractEditRequest(
       }
     }
 
-    // Validate totalPrice > initialPayment if both are provided
     if (totalPrice !== undefined && initialPayment !== undefined) {
       if (totalPrice <= initialPayment) {
         return next(
@@ -99,7 +82,6 @@ export async function validateContractEditRequest(
   }
 }
 
-// Extend Express Request type to include validatedData
 declare global {
   namespace Express {
     interface Request {

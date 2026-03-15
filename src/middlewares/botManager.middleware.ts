@@ -3,7 +3,6 @@ import Employee from "../schemas/employee.schema";
 import BaseError from "../utils/base.error";
 import logger from "../utils/logger";
 import jwt from "../utils/jwt";
-// import { RoleEnum } from "../enums/role.enum";
 
 export const botManager = async (
   req: Request,
@@ -20,7 +19,6 @@ export const botManager = async (
       return next(BaseError.UnauthorizedError());
     }
 
-    // 🔧 DEVELOPMENT: Mock token bypass
     if (process.env.NODE_ENV === "development" && accessToken.startsWith("mock_token_")) {
       const employeeId = accessToken.replace("mock_token_", "");
       const employee = await Employee.findById(employeeId).populate("role").exec();
@@ -65,7 +63,6 @@ export const botManager = async (
 
     const userRole = user.role?.name;
 
-    // Manager va Seller rollariga ruxsat berish
     const allowedRoles = ["manager", "seller", "admin", "moderator"];
     if (!allowedRoles.includes(userRole || "")) {
       return next(BaseError.ForbiddenError());

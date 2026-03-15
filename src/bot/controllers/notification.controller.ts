@@ -47,9 +47,7 @@ class NotificationController {
     }
   }
 
-  /**
-   * Mark notification as read
-   */
+  
   async markAsRead(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -65,9 +63,7 @@ class NotificationController {
     }
   }
 
-  /**
-   * Mark all notifications as read
-   */
+  
   async markAllAsRead(req: Request, res: Response, next: NextFunction) {
     try {
       const managerId = req.user?.sub;
@@ -87,9 +83,7 @@ class NotificationController {
     }
   }
 
-  /**
-   * Delete all notifications
-   */
+  
   async deleteAll(req: Request, res: Response, next: NextFunction) {
     try {
       const managerId = req.user?.sub;

@@ -1,19 +1,17 @@
 import express, { NextFunction, Request, Response } from "express";
+
 import "dotenv/config";
+import path from "path";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import logger from "./utils/logger";
 import routes from "./dashboard/routes/index";
 import routesSeller from "./seller/routes/index";
 import routesBot from "./bot/routes/index";
-import path from "path";
 
 import uploadsCsv from "./updatesData/routes/index";
-
-//middleware
 import ErrorMiddleware from "./middlewares/error.middleware";
 
-// Monitoring
 import {
   healthCheck,
   livenessProbe,
@@ -32,7 +30,6 @@ if (!dashbordHostUrl || !BotHostUrl) {
   );
 }
 
-// CORS configuration
 const allowedOrigins = [
   dashbordHostUrl,
   BotHostUrl,
@@ -42,7 +39,6 @@ const allowedOrigins = [
 
 if (botWebAppUrl) {
   allowedOrigins.push(botWebAppUrl);
-  // Agar Vercel URL bo'lsa, barcha subdomain'larni qo'shish
   if (botWebAppUrl.includes("vercel.app")) {
     allowedOrigins.push("https://nasiya-bot.vercel.app");
     allowedOrigins.push("https://nasiya-bot-git-main.vercel.app");
@@ -75,7 +71,6 @@ app.use(
         return callback(null, true);
       }
 
-      // Check if origin is in allowed list
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
@@ -98,27 +93,23 @@ app.use(
       "ngrok-skip-browser-warning",
     ],
     exposedHeaders: ["Set-Cookie"],
-    maxAge: 86400, // 24 hours
+    maxAge: 86400,
   }),
 );
 
 app.use(express.json());
 app.use(cookieParser());
 
-// Metrics middleware
 app.use(metricsMiddleware);
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Health check endpoints
 app.get("/health", healthCheck);
 app.get("/health/live", livenessProbe);
 app.get("/health/ready", readinessProbe);
 
-// Metrics endpoint
 app.get("/api/metrics", getMetrics);
 
-// Global request logger
 app.use((req, res, next) => {
   if (
     req.path.includes("/payment/pay-all-remaining") ||
@@ -154,7 +145,6 @@ app.use(
   }),
 );
 
-// Telegram webhook endpoint
 import bot from "./bot/main";
 app.post("/telegram-webhook", (req, res) => {
   bot.handleUpdate(req.body, res);
@@ -164,7 +154,6 @@ app.get("/", (req, res) => {
   res.json({ test: "nasiya server" });
 });
 
-//middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   ErrorMiddleware(err, req, res, next);
 });

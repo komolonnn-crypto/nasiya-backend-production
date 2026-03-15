@@ -77,7 +77,6 @@ class ExpensesSrvice {
     });
     await expenses.save();
 
-    // Audit log
     const managerName = `${manager.firstName} ${manager.lastName}`;
     await auditLogService.logExpensesCreate(
       expenses._id.toString(),
@@ -162,7 +161,6 @@ class ExpensesSrvice {
     existingExpenses.isActive = false;
     await existingExpenses.save();
 
-    // Audit log
     const managerName = `${manager.firstName} ${manager.lastName}`;
     await auditLogService.logExpensesReturn(
       id,

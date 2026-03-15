@@ -1,53 +1,21 @@
-/**
- * Transaction Wrapper Utility
- * 
- * MongoDB Transaction support with fallback for development
- * 
- * Usage:
- *   await withTransaction(async (session) => {
- *     await Model1.create([data], { session });
- *     await Model2.findByIdAndUpdate(id, update, { session });
- *   });
- * 
- * Environment:
- *   - MONGODB_REPLICA_SET=true  - Enable transactions (Production)
- *   - MONGODB_REPLICA_SET=false - Disable transactions (Development)
- */
+
 
 import mongoose, { ClientSession } from "mongoose";
 import logger from "./logger";
 
-/**
- * Check if MongoDB Replica Set is available
- */
 const isReplicaSetEnabled = (): boolean => {
   const replicaSetEnv = process.env.MONGODB_REPLICA_SET;
   return replicaSetEnv === "true";
 };
 
-/**
- * Execute operation with transaction support
- * 
- * @param operation - Async function that performs database operations
- * @returns Result of the operation
- * 
- * @example
- * const result = await withTransaction(async (session) => {
- *   const payment = await Payment.create([paymentData], { session });
- *   const contract = await Contract.findByIdAndUpdate(id, update, { session });
- *   return { payment, contract };
- * });
- */
 export async function withTransaction<T>(
   operation: (session: ClientSession | null) => Promise<T>
 ): Promise<T> {
-  // Development mode - no transaction
   if (!isReplicaSetEnabled()) {
     logger.debug("📝 Running without transaction (standalone MongoDB)");
     return await operation(null);
   }
 
-  // Production mode - with transaction
   logger.debug("🔒 Starting transaction (Replica Set)");
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -66,19 +34,6 @@ export async function withTransaction<T>(
   }
 }
 
-/**
- * Execute multiple operations in a single transaction
- * 
- * @param operations - Array of async functions
- * @returns Array of results
- * 
- * @example
- * const [payment, contract, balance] = await withTransactionBatch([
- *   (session) => Payment.create([data], { session }),
- *   (session) => Contract.findByIdAndUpdate(id, update, { session }),
- *   (session) => Balance.findOneAndUpdate(query, update, { session })
- * ]);
- */
 export async function withTransactionBatch<T extends any[]>(
   operations: Array<(session: ClientSession | null) => Promise<any>>
 ): Promise<T> {
@@ -92,13 +47,6 @@ export async function withTransactionBatch<T extends any[]>(
   });
 }
 
-/**
- * Retry transaction on specific errors (e.g., TransientTransactionError)
- * 
- * @param operation - Operation to retry
- * @param maxRetries - Maximum number of retries (default: 3)
- * @returns Result of the operation
- */
 export async function withTransactionRetry<T>(
   operation: (session: ClientSession | null) => Promise<T>,
   maxRetries: number = 3
@@ -111,7 +59,6 @@ export async function withTransactionRetry<T>(
     } catch (error: any) {
       lastError = error;
       
-      // Check if error is retryable
       const isRetryable = 
         error.hasErrorLabel?.("TransientTransactionError") ||
         error.hasErrorLabel?.("UnknownTransactionCommitResult");
@@ -121,7 +68,7 @@ export async function withTransactionRetry<T>(
       }
       
       logger.warn(`⚠️ Transaction failed (attempt ${attempt}/${maxRetries}), retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 100 * attempt)); // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 100 * attempt));
     }
   }
   

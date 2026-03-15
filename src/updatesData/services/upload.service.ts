@@ -16,7 +16,6 @@ import Notes from "../../schemas/notes.schema";
 
 export const importContractsFromCSV = async (filePath: string) => {
   const jsonArray = await csv().fromFile(path.resolve(filePath));
-  // const insertedContracts = [];
 
   const role = await Role.findOne({ name: RoleEnum.MANAGER });
   const roleAdmin = await Role.findOne({ name: RoleEnum.ADMIN });
@@ -101,7 +100,6 @@ export const importContractsFromCSV = async (filePath: string) => {
       info: normalizeInfoFields(row),
     });
 
-    // paymentlar (01/2023 - 12/2025 ustunlaridan)
     const paymentKeys = Object.keys(row)
       .filter((key) => /\d{2}\/\d{4}/.test(key))
       .sort((a, b) => {
@@ -110,9 +108,9 @@ export const importContractsFromCSV = async (filePath: string) => {
         return new Date(ay, am - 1).getTime() - new Date(by, bm - 1).getTime();
       });
 
-    let totalPaid = parseCurrency(row.initialPayment); // boshlang'ich to'lov
+    let totalPaid = parseCurrency(row.initialPayment);
     const monthlyPayment = parseCurrency(row.monthlyPayment);
-    let currentMonthIndex = 0; // To'langan oylar soni
+    let currentMonthIndex = 0;
 
     logger.debug(`\nProcessing payments for ${row.customer}:`);
     logger.debug(`Monthly payment: ${monthlyPayment}$`);
@@ -132,9 +130,7 @@ export const importContractsFromCSV = async (filePath: string) => {
         `\n📅 Processing ${paymentMonth}: ${paymentAmount}$ (Monthly: ${monthlyPayment}$)`
       );
 
-      // ✅ YANGI LOGIKA: Agar to'lov oylik to'lovdan katta bo'lsa, bir necha oyga taqsimlash
       if (paymentAmount > monthlyPayment + 0.01) {
-        // Katta to'lov - bir necha oyga taqsimlash
         let remainingAmount = paymentAmount;
         let monthsToDistribute = Math.floor(paymentAmount / monthlyPayment);
         const remainder = paymentAmount % monthlyPayment;
@@ -145,13 +141,10 @@ export const importContractsFromCSV = async (filePath: string) => {
           )}$ qoldiq`
         );
 
-        // To'liq oylar uchun to'lovlar yaratish
         for (let i = 0; i < monthsToDistribute; i++) {
           currentMonthIndex++;
           const monthNumber = currentMonthIndex;
 
-          // ✅ MUHIM: date - bu to'lov qaysi oyga tegishli (7-oy, 8-oy, ...)
-          // confirmedAt - bu haqiqatda qachon to'langan (06/2025)
           const monthDate = new Date(paymentDate);
           monthDate.setMonth(monthDate.getMonth() + i);
 
@@ -164,14 +157,14 @@ export const importContractsFromCSV = async (filePath: string) => {
           const payment = await Payment.create({
             amount: monthlyPayment,
             actualAmount: monthlyPayment,
-            date: monthDate, // To'lov qaysi oyga tegishli (7-oy, 8-oy, ...)
+            date: monthDate,
             isPaid: true,
             paymentType: PaymentType.MONTHLY,
             status: PaymentStatus.PAID,
             notes: payNotes,
             customerId: customer._id,
             managerId: employee ? employee._id : admin?._id,
-            confirmedAt: paymentDate, // ✅ Haqiqatda qachon to'langan (06/2025)
+            confirmedAt: paymentDate,
             confirmedBy: admin?._id,
           });
 
@@ -188,13 +181,10 @@ export const importContractsFromCSV = async (filePath: string) => {
           remainingAmount -= monthlyPayment;
         }
 
-        // Qoldiq summa uchun to'lov yaratish (agar mavjud bo'lsa)
         if (remainder > 0.01) {
           currentMonthIndex++;
           const monthNumber = currentMonthIndex;
 
-          // ✅ MUHIM: date - bu to'lov qaysi oyga tegishli
-          // confirmedAt - bu haqiqatda qachon to'langan (06/2025)
           const monthDate = new Date(paymentDate);
           monthDate.setMonth(monthDate.getMonth() + monthsToDistribute);
 
@@ -209,7 +199,7 @@ export const importContractsFromCSV = async (filePath: string) => {
           const payment = await Payment.create({
             amount: monthlyPayment,
             actualAmount: remainder,
-            date: monthDate, // To'lov qaysi oyga tegishli
+            date: monthDate,
             isPaid: true,
             paymentType: PaymentType.MONTHLY,
             status:
@@ -221,7 +211,7 @@ export const importContractsFromCSV = async (filePath: string) => {
             notes: payNotes,
             customerId: customer._id,
             managerId: employee ? employee._id : admin?._id,
-            confirmedAt: paymentDate, // ✅ Haqiqatda qachon to'langan (06/2025)
+            confirmedAt: paymentDate,
             confirmedBy: admin?._id,
           });
 
@@ -247,7 +237,6 @@ export const importContractsFromCSV = async (filePath: string) => {
 
         totalPaid += paymentAmount;
       } else {
-        // Oddiy to'lov (oylik to'lovdan kichik yoki teng)
         currentMonthIndex++;
         const monthNumber = currentMonthIndex;
 
@@ -299,7 +288,6 @@ export const importContractsFromCSV = async (filePath: string) => {
         );
       }
 
-      // Balance yangilash
       const balance = await import("../../schemas/balance.schema").then(
         (m) => m.Balance
       );
@@ -326,7 +314,6 @@ export const importContractsFromCSV = async (filePath: string) => {
 
     logger.debug(`✓ Added ${currentMonthIndex} payments to contract\n`);
 
-    // ✅ Initial payment yaratish (agar mavjud bo'lsa)
     const initialPaymentAmount = parseCurrency(row.initialPayment);
     if (initialPaymentAmount > 0) {
       const initialNotes = await Notes.create({
@@ -353,7 +340,6 @@ export const importContractsFromCSV = async (filePath: string) => {
         $push: { payments: initialPayment._id },
       });
 
-      // Balance yangilash
       const balance = await import("../../schemas/balance.schema").then(
         (m) => m.Balance
       );
@@ -382,7 +368,6 @@ export const importContractsFromCSV = async (filePath: string) => {
       await contract.save();
     }
 
-    // insertedContracts.push(contract);
   }
 
   return jsonArray;
@@ -413,13 +398,12 @@ function calculateDiscountPercent(
   if (!totalPrice || isNaN(totalPrice) || isNaN(price)) return 0;
 
   const discount = ((totalPrice - price) * 100) / totalPrice;
-  return Math.round(discount * 100) / 100; // 2 xonagacha yaxlitlash
+  return Math.round(discount * 100) / 100;
 }
 
 const parseCurrency = (value: string | number): number => {
   if (!value && value !== 0) return 0;
 
-  // ✅ YANGI: Agar raqam bo'lsa, to'g'ridan-to'g'ri qaytarish
   if (typeof value === "number") {
     return value;
   }
@@ -452,25 +436,18 @@ const parseCurrency = (value: string | number): number => {
 function isValidPaymentAmount(value: string | number): boolean {
   if (value === undefined || value === null || value === "") return false;
 
-  // ✅ YANGI: Agar raqam bo'lsa, to'g'ridan-to'g'ri tekshirish
   if (typeof value === "number") {
     return !isNaN(value) && value >= 0;
   }
 
-  // String format
   const valueStr = String(value);
 
-  // Naqd yoki $ belgilarini olib tashlash, faqat sonlar, nuqta yoki vergul qoldirish
   const cleaned = valueStr.replace(/[^0-9.,]/g, "").trim();
 
   if (!cleaned) return false;
 
-  // Tozalangandan so'ng hali ham son bo'lishi kerak
   const number = parseCurrency(cleaned);
 
-  // Quyidagilar valid hisoblanadi:
-  // 0, 0.0, 0.00 — hammasi qabul qilinadi
-  // 400m, 7mln — son emas bo'lgani uchun false qaytariladi
   const isPureNumber = /^[0-9]+([.,][0-9]{1,2})?$/.test(cleaned);
 
   return isPureNumber && !isNaN(number);
@@ -496,24 +473,20 @@ function getNextPaymentDateFromPayments(
     .split("/")
     .map(Number);
 
-  // keyingi oy
   const nextMonth = lastMonth === 12 ? 1 : lastMonth + 1;
   const nextYear = lastMonth === 12 ? lastYear + 1 : lastYear;
 
   return new Date(nextYear, nextMonth - 1, 1);
 }
 
-// Sana "DD/MM/YYYY" yoki Excel serial number bo'lsa uni Date ga aylantirish
 function parseDate(value: string | number): Date | null {
   if (!value) return null;
 
-  // ✅ YANGI: Excel serial number (masalan: 45793)
   if (typeof value === "number" || !isNaN(Number(value))) {
-    const excelEpoch = new Date(1899, 11, 30); // Excel epoch: December 30, 1899
+    const excelEpoch = new Date(1899, 11, 30);
     const days = Number(value);
     const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
 
-    // Validate date
     if (!isNaN(date.getTime())) {
       logger.debug(
         `📅 Parsed Excel date: ${value} → ${date.toLocaleDateString("uz-UZ")}`
@@ -522,10 +495,8 @@ function parseDate(value: string | number): Date | null {
     }
   }
 
-  // String format: "DD/MM/YYYY" yoki "DD.MM.YYYY"
   const valueStr = String(value);
 
-  // Try DD/MM/YYYY format
   const slashParts = valueStr.split("/");
   if (slashParts.length === 3) {
     const [day, month, year] = slashParts.map(Number);
@@ -537,7 +508,6 @@ function parseDate(value: string | number): Date | null {
     }
   }
 
-  // Try DD.MM.YYYY format
   const dotParts = valueStr.split(".");
   if (dotParts.length === 3) {
     const [day, month, year] = dotParts.map(Number);
@@ -553,7 +523,6 @@ function parseDate(value: string | number): Date | null {
   return new Date();
 }
 
-// To‘lov ustunlari uchun (masalan "03/2024" → 2024-03-01)
 function parseDateFromColumn(monthYear: string): Date {
   const [month, year] = monthYear.split("/").map(Number);
   return new Date(year, month - 1, 1);

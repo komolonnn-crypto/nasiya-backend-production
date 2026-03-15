@@ -34,10 +34,6 @@ class CustomerDto {
 }
 
 export class CreateCustomerDto extends CustomerDto {
-  // @IsNumber()
-  // @IsNotEmpty()
-  // percent: number;
-
   @IsMongoId({ message: "Manager noto‘g‘ri MongoId formatida bo‘lishi kerak" })
   @IsNotEmpty({ message: "Manager bo'sh bo'lmasligi kerak" })
   managerId: string;

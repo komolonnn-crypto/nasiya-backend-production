@@ -1,11 +1,6 @@
 import mongoose from "mongoose";
 import logger from "../utils/logger";
 
-/**
- * Migration 010: Add paymentMethod field to Payment schema
- * Purpose: Add payment method field (so'm naqd, karta, dollar, visa)
- */
-
 export const up = async () => {
   try {
     logger.info("🔄 Running migration 010: Add paymentMethod field");
@@ -17,7 +12,6 @@ export const up = async () => {
 
     const paymentsCollection = db.collection("payments");
 
-    // Add paymentMethod field to all existing payments (optional field, no default)
     const result = await paymentsCollection.updateMany(
       { paymentMethod: { $exists: false } },
       { $set: { paymentMethod: null } }
@@ -41,7 +35,6 @@ export const down = async () => {
 
     const paymentsCollection = db.collection("payments");
 
-    // Remove paymentMethod field
     const result = await paymentsCollection.updateMany(
       {},
       { $unset: { paymentMethod: "" } }

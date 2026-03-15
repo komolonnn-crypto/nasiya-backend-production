@@ -18,9 +18,8 @@ class DashboardService {
         Debtor.countDocuments(),
       ]);
 
-    // Valyuta kursini olish
     const currencyCourse = await Currency.findOne().sort({ createdAt: -1 });
-    const exchangeRate = currencyCourse?.amount || 12500; // Default: 1$ = 12500 so'm
+    const exchangeRate = currencyCourse?.amount || 12500;
 
     const [totalBalance] = await Balance.aggregate([
       {
@@ -44,7 +43,6 @@ class DashboardService {
       sum: 0,
     };
 
-    // Balans (so'm) ni hisoblash: Balans ($) * dollar kursi
     const calculatedBalance = totalBalance || defaultBalance;
     const balanceInSum = Math.round(calculatedBalance.dollar * exchangeRate);
 
@@ -58,7 +56,6 @@ class DashboardService {
       { $project: { _id: 0, totalInitialPayment: 1 } },
     ]);
 
-    // 2. To'langan summa yig'indisi (faqat to'langanlar)
     const [paidAmountData] = await Payment.aggregate([
       { $match: { isPaid: true } },
       {
@@ -70,7 +67,6 @@ class DashboardService {
       { $project: { _id: 0, totalPaidAmount: 1 } },
     ]);
 
-    // 3. Total contract prices
     const [contractTotalPriceData] = await Contract.aggregate([
       {
         $group: {
@@ -96,7 +92,7 @@ class DashboardService {
         debtors: debtorCount,
         totalBalance: {
           dollar: calculatedBalance.dollar,
-          sum: balanceInSum, // Hisoblangan so'm miqdori
+          sum: balanceInSum,
         },
         financial: {
           totalContractPrice,
@@ -108,7 +104,6 @@ class DashboardService {
     };
   }
 
-  // Sodda statistic funksiya
   async statistic(range: string) {
     try {
       logger.debug("=== STATISTIC CALCULATION START ===");
@@ -117,14 +112,12 @@ class DashboardService {
       const now = new Date();
       logger.debug("Current date:", now);
 
-      // Oxirgi 12 oy uchun
       const startDate = dayjs(now)
         .subtract(11, "month")
         .startOf("month")
         .toDate();
       logger.debug("Start date:", startDate);
 
-      // Faqat Payment collection'dan ma'lumot olish
       const payments = await Payment.find({
         isPaid: true,
         date: { $gte: startDate },
@@ -135,7 +128,6 @@ class DashboardService {
       logger.debug("Found payments:", payments.length);
       logger.debug("Sample payments:", payments.slice(0, 3));
 
-      // Oylik ma'lumotlar uchun
       const monthNames = [
         "Dec",
         "Jan",
@@ -151,17 +143,14 @@ class DashboardService {
         "Nov",
       ];
 
-      // Bo'sh result yaratish
       const result = new Map<string, number>();
 
-      // Oxirgi 12 oyni 0 bilan to'ldirish
       for (let i = 11; i >= 0; i--) {
         const date = dayjs(now).subtract(i, "month");
         const monthName = monthNames[date.month()];
         result.set(monthName, 0);
       }
 
-      // To'lovlarni oylarga bo'lib joylashtirish
       for (const payment of payments) {
         const paymentDate = dayjs(payment.date);
         const monthName = monthNames[paymentDate.month()];
@@ -184,7 +173,6 @@ class DashboardService {
     } catch (error) {
       logger.error("Error in statistic:", error);
 
-      // Xato bo'lsa, bo'sh data qaytarish
       const monthNames = [
         "Dec",
         "Jan",

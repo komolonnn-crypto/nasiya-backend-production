@@ -10,7 +10,7 @@ import {
   IsDateString,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { PaymentMethod } from "../schemas/payment.schema";
+import { ExcessHandling, PaymentMethod } from "../schemas/payment.schema";
 
 class CurrencyDetailsDto {
   @IsNumber({}, { message: "Dollar qiymati raqam bo'lishi kerak" })
@@ -33,15 +33,19 @@ export class PayDto {
 
   @IsNumber({}, { message: "Target oy raqam bo'lishi kerak" })
   @Min(1, { message: "Target oy 1 dan kichik bo'lmasligi kerak" })
-  targetMonth: number; // ✅ Yangi: Qaysi oyga to'lov qilinayotgani (REQUIRED)
+  targetMonth: number;
 
   @IsDateString({}, { message: "Keyingi to'lov sanasi noto'g'ri formatda" })
   @IsOptional()
-  nextPaymentDate?: string; // ✅ YANGI: Kam to'lov bo'lsa, qolgan qismini qachon to'lash kerak
+  nextPaymentDate?: string;
 
   @IsEnum(PaymentMethod, { message: "To'lov usuli noto'g'ri" })
   @IsOptional()
-  paymentMethod?: PaymentMethod; // ✅ YANGI: To'lov usuli (so'm naqd, karta, dollar, visa)
+  paymentMethod?: PaymentMethod;
+
+  @IsEnum(ExcessHandling, { message: "Ortiqcha to'lov turi noto'g'ri" })
+  @IsOptional()
+  excessHandling?: ExcessHandling;
 
   @ValidateNested()
   @Type(() => CurrencyDetailsDto)
@@ -64,8 +68,6 @@ export class PayNewDebtDto extends PayDto {
   id: string;
 }
 
-// Yangi validator'lar - Payment Service uchun
-
 export class ReceivePaymentDto {
   @IsMongoId({ message: "Contract ID noto'g'ri" })
   @IsNotEmpty({ message: "Contract ID bo'sh bo'lmasligi kerak" })
@@ -81,11 +83,11 @@ export class ReceivePaymentDto {
 
   @IsDateString({}, { message: "Keyingi to'lov sanasi noto'g'ri formatda" })
   @IsOptional()
-  nextPaymentDate?: string; // ✅ YANGI: Kam to'lov bo'lsa, qolgan qismini qachon to'lash kerak
+  nextPaymentDate?: string;
 
   @IsEnum(PaymentMethod, { message: "To'lov usuli noto'g'ri" })
   @IsOptional()
-  paymentMethod?: PaymentMethod; // ✅ YANGI: To'lov usuli (so'm naqd, karta, dollar, visa)
+  paymentMethod?: PaymentMethod;
 
   @ValidateNested()
   @Type(() => CurrencyDetailsDto)

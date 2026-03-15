@@ -25,9 +25,8 @@ class EmployeeService {
   }
 
   async getAll() {
-    // ✅ YANGI: Admin ham ko'rinadi (balans uchun)
     const employees = await Employee.find({
-      isDeleted: false, // Faqat o'chirilmagan xodimlar
+      isDeleted: false,
     }).populate("role");
 
     const result = employees.map((emp) => ({
@@ -70,7 +69,7 @@ class EmployeeService {
       },
       {
         $lookup: {
-          from: "balances", // Balance modelining MongoDBdagi nomi
+          from: "balances",
           localField: "_id",
           foreignField: "managerId",
           as: "balance",
@@ -78,7 +77,7 @@ class EmployeeService {
       },
       {
         $addFields: {
-          balance: { $arrayElemAt: ["$balance", 0] }, // bitta natijani olish
+          balance: { $arrayElemAt: ["$balance", 0] },
         },
       },
       {
@@ -126,8 +125,6 @@ class EmployeeService {
   }
 
   async getManager() {
-    // ✅ Barcha active xodimlarni qaytarish (admin, manager, moderator)
-    // Audit log'da barcha xodimlar harakatini ko'rish uchun
     const employees = await Employee.find(
       {
         isDeleted: false,
@@ -136,13 +133,12 @@ class EmployeeService {
       "_id firstName lastName",
     ).populate("role", "name");
 
-    // Frontend uchun fullName qo'shamiz
     return employees.map((emp) => ({
       _id: emp._id,
       firstName: emp.firstName,
       lastName: emp.lastName,
       fullName: `${emp.firstName} ${emp.lastName}`,
-      role: emp.role?.name, // Role ham yuboramiz (agar kerak bo'lsa)
+      role: emp.role?.name,
     }));
   }
 
@@ -287,10 +283,6 @@ class EmployeeService {
   }
 
   async delete(id: string, user?: IJwtUser) {
-    // ⚠️ DEVELOPMENT: Transaction disabled for standalone MongoDB
-    // const session = await mongoose.startSession();
-    // session.startTransaction();
-
     try {
       const employee = await Employee.findById(id).populate("role");
 
@@ -307,20 +299,16 @@ class EmployeeService {
       const employeeName = `${employee.firstName} ${employee.lastName}`;
       const employeeRole = employee.role?.name || "unknown";
 
-      // ✅ CASCADE: Employee o'chirilganda bog'liq ma'lumotlarni boshqarish
       const { cascadeDeleteEmployee } =
         await import("../../middlewares/cascade.middleware");
-      await cascadeDeleteEmployee(id, undefined); // session = undefined for dev mode
+      await cascadeDeleteEmployee(id, undefined);
 
-      // Auth'ni o'chirish
       if (employee.auth) {
         await Auth.findByIdAndDelete(employee.auth);
       }
 
-      // Employee'ni o'chirish
       await Employee.findByIdAndDelete(id);
 
-      // await session.commitTransaction();
       logger.debug(
         "✅ Employee va bog'liq ma'lumotlar o'chirildi (NO TRANSACTION - DEV MODE)",
       );
@@ -336,11 +324,9 @@ class EmployeeService {
 
       return { message: "Xodim o'chirildi." };
     } catch (error) {
-      // await session.abortTransaction();
       logger.error("❌ Employee o'chirishda xatolik:", error);
       throw error;
     } finally {
-      // session.endSession();
     }
   }
 
@@ -378,7 +364,6 @@ class EmployeeService {
         sum: balance.sum,
       });
 
-      // 1. So'm summasini dollarga o'girish
       const changes = data.currencyDetails;
       const Currency = await import("../../schemas/currency.schema");
       const currency = await Currency.default.findOne().sort({ createdAt: -1 });
@@ -395,7 +380,6 @@ class EmployeeService {
         totalDollarsToWithdraw: totalDollarsToWithdraw,
       });
 
-      // Faqat dollar balansni tekshirish
       if (balance.dollar < totalDollarsToWithdraw) {
         logger.error("❌ Insufficient dollar balance");
         throw BaseError.BadRequest(
@@ -403,13 +387,12 @@ class EmployeeService {
         );
       }
 
-      // 2. Expense yaratish (xarajat yozuvi)
       logger.info("📝 Creating expense record...");
       const { Expenses } = await import("../../schemas/expenses.schema");
       const expense = await Expenses.create({
         managerId: employeeExist._id,
         dollar: totalDollarsToWithdraw,
-        sum: 0, // Database'da faqat dollarda saqlaymiz
+        sum: 0,
         isActive: true,
         notes:
           data.notes ||
@@ -418,10 +401,8 @@ class EmployeeService {
 
       logger.debug("✅ Expense created:", expense._id);
 
-      // 3. Balansni kamaytirish (faqat dollar)
       logger.debug("💳 Updating balance...");
       balance.dollar -= totalDollarsToWithdraw;
-      // balance.sum ni o'zgartirmaymiz chunki u mavjud emas
       await balance.save();
 
       logger.debug("✅ Balance updated successfully:", {
@@ -429,7 +410,6 @@ class EmployeeService {
         newSum: balance.sum,
       });
 
-      // 4. Audit log qo'shish
       if (user) {
         const managerName = `${employeeExist.firstName} ${employeeExist.lastName}`;
         await auditLogService.logExpensesCreate(
@@ -439,7 +419,7 @@ class EmployeeService {
           totalDollarsToWithdraw,
           0,
           data.notes || "Balansdan pul yechib olindi",
-          user.sub, // Kim yechib olganini ko'rsatamiz
+          user.sub,
         );
       }
 

@@ -15,7 +15,7 @@ router.put(
 
 router.post(
   "/contract",
-  authenticate, // Oddiy authentication
+  authenticate,
   paymentController.payByContract,
 );
 
@@ -25,7 +25,6 @@ router.get(
   paymentController.getPaymentHistory,
 );
 
-// Yangi route'lar - Payment Service uchun
 router.post(
   "/receive",
   checkPermission(Permission.UPDATE_CASH),
@@ -44,31 +43,24 @@ router.post(
   paymentController.rejectPayment,
 );
 
-// Barcha oylarni to'lash endpoint
 router.post(
   "/pay-all-remaining",
-  authenticate, // Oddiy authentication (permission tekshirilmaydi)
+  authenticate,
   paymentController.payAllRemainingMonths,
 );
 
-// Qolgan qarzni to'lash endpoint (mavjud to'lovga qo'shimcha)
 router.post(
   "/pay-remaining",
-  authenticate, // Oddiy authentication
+  authenticate,
   paymentController.payRemaining,
 );
 
-// ✅ YANGI: PENDING to'lovlarni tekshirish va muddati o'tganlarni rad etish
 router.post(
   "/check-expired",
-  checkPermission(Permission.UPDATE_CASH), // Faqat kassa uchun
+  checkPermission(Permission.UPDATE_CASH),
   paymentController.checkAndRejectExpiredPayments,
 );
 
-// ========================================
-// ✏️ TO'LOV SUMMASINI TAHRIRLASH
-// ONLY: admin, moderator
-// ========================================
 router.patch("/edit-amount", authenticate, paymentController.editPaymentAmount);
 
 export default router;

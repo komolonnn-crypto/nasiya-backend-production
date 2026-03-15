@@ -4,7 +4,7 @@ import { IEmployee } from "./employee.schema";
 export interface IBalance {
   managerId: IEmployee;
   dollar: number;
-  sum?: number; // Optional, faqat display uchun
+  sum?: number;
 }
 
 const BalanceSchema = new Schema<IBalance>(
@@ -16,7 +16,7 @@ const BalanceSchema = new Schema<IBalance>(
       unique: true,
     },
     dollar: { type: Number, default: 0 },
-    sum: { type: Number, default: 0, required: false }, // Optional field
+    sum: { type: Number, default: 0, required: false },
   },
   { timestamps: true }
 );

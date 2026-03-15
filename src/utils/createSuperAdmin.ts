@@ -1,4 +1,3 @@
-// import User from "../schemas/user.schema";
 import { RoleEnum } from "../enums/role.enum";
 import { Permission } from "../enums/permission.enum";
 import Auth from "../schemas/auth.schema";
@@ -57,7 +56,6 @@ const createSuperAdmin = async () => {
       await superAdmin.save();
       logger.debug("Super Admin created");
     } else {
-      // Mavjud super adminga barcha permissionlarni berish
       const allPermissions = Object.values(Permission);
       if (existingAdmin.permissions.length < allPermissions.length) {
         existingAdmin.permissions = allPermissions;

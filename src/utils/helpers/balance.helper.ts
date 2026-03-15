@@ -2,16 +2,8 @@ import { Balance } from "../../schemas/balance.schema";
 import { IEmployee } from "../../schemas/employee.schema";
 import logger from "../../utils/logger";
 
-/**
- * Balance Helper
- * Balance bilan ishlash uchun yordamchi funksiyalar
- */
 export class BalanceHelper {
-  /**
-   * Balance yangilash
-   * @param managerId - Manager ID
-   * @param changes - O'zgarishlar (dollar, sum)
-   */
+  
   static async updateBalance(
     managerId: IEmployee | string,
     changes: {
@@ -45,10 +37,7 @@ export class BalanceHelper {
     }
   }
 
-  /**
-   * Balance olish
-   * @param managerId - Manager ID
-   */
+  
   static async getBalance(managerId: IEmployee | string) {
     try {
       const balance = await Balance.findOne({ managerId });

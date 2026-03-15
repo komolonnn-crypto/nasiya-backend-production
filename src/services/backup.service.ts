@@ -7,11 +7,10 @@ import excelExportService from "./excel-export.service";
 
 class BackupService {
   private lastBackupHash: string | null = null;
-  private telegramChannelId = process.env.TELEGRAM_CHAT_ID; // Backup kanal ID
+  private telegramChannelId = process.env.TELEGRAM_CHAT_ID;
   private backupBot: Telegraf | null = null;
 
   constructor() {
-    // Backup bot'ni ishga tushirish (alohida bot)
     const backupBotToken = process.env.TELEGRAM_BOT_TOKEN;
     if (backupBotToken) {
       this.backupBot = new Telegraf(backupBotToken);
@@ -21,9 +20,7 @@ class BackupService {
     }
   }
 
-  /**
-   * Excel database backup yaratish va Telegram'ga yuborish
-   */
+  
   async createBackup(): Promise<{
     success: boolean;
     message: string;
@@ -32,7 +29,6 @@ class BackupService {
     try {
       logger.info("📊 Starting Excel database backup...");
 
-      // 1. Excel export qilish
       const exportResult = await excelExportService.exportDatabase();
 
       if (!exportResult.success || !exportResult.filePath) {
@@ -47,10 +43,8 @@ class BackupService {
 
       const excelFilePath = exportResult.filePath;
 
-      // 2. File hash'ini hisoblash (duplicate detection)
       const fileHash = await this.calculateFileHash(excelFilePath);
 
-      // 3. Duplicate check: Agar hash bir xil bo'lsa, yubormaslik
       if (this.lastBackupHash === fileHash) {
         logger.info("⏭️ Backup unchanged (duplicate), skipping upload");
         fs.unlinkSync(excelFilePath);
@@ -60,12 +54,10 @@ class BackupService {
         };
       }
 
-      // 4. Telegram kanalga yuborish
       if (this.telegramChannelId) {
         await this.sendToTelegram(excelFilePath);
         this.lastBackupHash = fileHash;
 
-        // ✅ Telegram'ga yuborilgandan keyin faylni o'chirish
         try {
           if (fs.existsSync(excelFilePath)) {
             fs.unlinkSync(excelFilePath);
@@ -81,12 +73,9 @@ class BackupService {
         logger.warn("⚠️ TELEGRAM_CHAT_ID not set, backup saved locally only");
       }
 
-      // 5. Eski export'larni tozalash (agar Telegram'ga yuborilmasa, local'da saqlanadi)
       if (this.telegramChannelId) {
-        // Telegram'ga yuborilsa, barcha eski fayllarni o'chirish
         await this.cleanAllExports();
       } else {
-        // Telegram'ga yuborilmasa, faqat oxirgi 5 tasini saqlash
         await excelExportService.cleanOldExports();
       }
 
@@ -104,9 +93,7 @@ class BackupService {
     }
   }
 
-  /**
-   * File hash'ini hisoblash (duplicate detection uchun)
-   */
+  
   private async calculateFileHash(filePath: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const hash = crypto.createHash("md5");
@@ -120,9 +107,7 @@ class BackupService {
     });
   }
 
-  /**
-   * Backup'ni Telegram kanalga yuborish
-   */
+  
   private async sendToTelegram(filePath: string): Promise<void> {
     try {
       if (!this.telegramChannelId) {
@@ -139,11 +124,11 @@ class BackupService {
       const fileSizeKB = (stats.size / 1024).toFixed(0);
 
       const now = new Date();
-      const date = now.toLocaleDateString("uz-UZ"); // 04.01.2026
+      const date = now.toLocaleDateString("uz-UZ");
       const time = now.toLocaleTimeString("uz-UZ", {
         hour: "2-digit",
         minute: "2-digit",
-      }); // 17:30
+      });
 
       const caption =
         `📊 Excel Backup\n\n` +
@@ -174,9 +159,7 @@ class BackupService {
     }
   }
 
-  /**
-   * Barcha eski export fayllarni o'chirish (Telegram'ga yuborilgandan keyin)
-   */
+  
   private async cleanAllExports(): Promise<void> {
     try {
       const exportDir = path.join(process.cwd(), "exports");
@@ -194,7 +177,6 @@ class BackupService {
         try {
           fs.unlinkSync(file);
         } catch (err) {
-          // Ignore errors
         }
       }
 
@@ -208,24 +190,20 @@ class BackupService {
     }
   }
 
-  /**
-   * Scheduled Excel backup (har 30 daqiqada)
-   */
+  
   startScheduledBackup(): void {
     logger.info("🕒 Starting scheduled Excel backup (every 1 minute)...");
 
-    // Dastlabki backup (10 soniyadan keyin)
     setTimeout(() => {
       this.createBackup();
     }, 10000);
 
-    // Har 50 daqiqada zaxiralash
     setInterval(
       () => {
         this.createBackup();
       },
       50 * 60 * 1000,
-    ); // har 50-daqiqada barcha ma'lumotlarni zaxiralab turadi
+    );
 
     logger.info("✅ Excel backup service started (1 min interval)");
   }

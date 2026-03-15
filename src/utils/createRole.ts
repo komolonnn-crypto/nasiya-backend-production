@@ -7,7 +7,6 @@ const seedRoles = async () => {
   if (roleCount > 0) {
     logger.debug("Roles already exist. Updating permissions...");
 
-    // Mavjud rolelarni yangilash
     await Role.findOneAndUpdate(
       { name: "seller" },
       {
@@ -38,16 +37,14 @@ const seedRoles = async () => {
           Permission.VIEW_DEBTOR,
           Permission.VIEW_CASH,
           Permission.CREATE_CASH,
-          Permission.UPDATE_CASH, // Manager ham tasdiqlashi mumkin
+          Permission.UPDATE_CASH,
           Permission.VIEW_DASHBOARD,
         ],
       }
     );
 
-    // Employee'larning permissionlarini yangilash
     const Employee = (await import("../schemas/employee.schema")).default;
 
-    // Manager role'dagi employee'larni yangilash
     const managerRole = await Role.findOne({ name: "manager" });
     if (managerRole) {
       await Employee.updateMany(
@@ -64,7 +61,7 @@ const seedRoles = async () => {
               Permission.VIEW_DEBTOR,
               Permission.VIEW_CASH,
               Permission.CREATE_CASH,
-              Permission.UPDATE_CASH, // Manager ham tasdiqlashi mumkin
+              Permission.UPDATE_CASH,
               Permission.VIEW_DASHBOARD,
             ],
           },
@@ -73,7 +70,6 @@ const seedRoles = async () => {
       logger.debug("Manager employees permissions updated (UPDATE_CASH added).");
     }
 
-    // Seller role'dagi employee'larni yangilash
     const sellerRole = await Role.findOne({ name: "seller" });
     if (sellerRole) {
       await Employee.updateMany(
@@ -97,7 +93,6 @@ const seedRoles = async () => {
       logger.debug("Seller employees permissions updated.");
     }
 
-    // Moderator role'dagi employee'larni yangilash
     const moderatorRole = await Role.findOne({ name: "moderator" });
     if (moderatorRole) {
       const allPermissions = Object.values(Permission);
@@ -117,7 +112,6 @@ const seedRoles = async () => {
       );
     }
 
-    // Admin role'dagi employee'larni yangilash
     const adminRole = await Role.findOne({ name: "admin" });
     if (adminRole) {
       const allPermissions = Object.values(Permission);
@@ -171,7 +165,7 @@ const seedRoles = async () => {
           Permission.VIEW_DEBTOR,
           Permission.VIEW_CASH,
           Permission.CREATE_CASH,
-          Permission.UPDATE_CASH, // Manager ham tasdiqlashi mumkin
+          Permission.UPDATE_CASH,
           Permission.VIEW_DASHBOARD,
         ],
       },

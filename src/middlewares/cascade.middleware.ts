@@ -1,15 +1,4 @@
-/**
- * CASCADE MIDDLEWARE
- * 
- * Mongoose'da avtomatik CASCADE yo'q, shuning uchun pre-remove middleware orqali boshqaramiz
- * 
- * Requirements:
- * - Employee o'chirilganda → Balance, Expenses, Payment, Notes, Debtor, Customer.manager'ni boshqarish
- * - Customer o'chirilganda → Contract, Payment, Notes'ni boshqarish
- * - Contract o'chirilganda → Payment, Notes, Debtor'ni boshqarish
- * 
- * Strategy: Logical Delete (isDeleted: true)
- */
+
 
 import mongoose from "mongoose";
 import Employee from "../schemas/employee.schema";
@@ -23,21 +12,6 @@ import { Debtor } from "../schemas/debtor.schema";
 import BaseError from "../utils/base.error";
 import logger from "../utils/logger";
 
-/**
- * CASCADE: Employee o'chirilganda
- * 
- * Employee o'chirilganda quyidagilar yuz beradi:
- * 1. Balance → O'chiriladi (Employee bilan 1:1 bog'liq)
- * 2. Expenses → isDeleted = true (tarixiy ma'lumot saqlanadi)
- * 3. Payment.managerId → null (tarixiy ma'lumot saqlanadi, lekin manager yo'q)
- * 4. Notes.createBy → null (tarixiy ma'lumot saqlanadi, lekin yaratuvchi yo'q)
- * 5. Debtor.createBy → null (tarixiy ma'lumot saqlanadi, lekin yaratuvchi yo'q)
- * 6. Customer.manager → null (mijoz yangi menegerga o'tkaziladi)
- * 7. Customer.editHistory.editedBy → null (tarixiy ma'lumot saqlanadi)
- * 8. Contract.editHistory.editedBy → null (tarixiy ma'lumot saqlanadi)
- * 
- * ⚠️ MUHIM: Employee o'chirishdan oldin unga bog'liq customerlarni boshqa menegerga o'tkazish kerak!
- */
 export async function cascadeDeleteEmployee(
   employeeId: string,
   session?: mongoose.ClientSession
@@ -45,7 +19,6 @@ export async function cascadeDeleteEmployee(
   try {
     logger.debug(`🗑️ CASCADE DELETE: Employee ${employeeId}`);
 
-    // 1. Customer'larni tekshirish
     const customersCount = await Customer.countDocuments({
       manager: employeeId,
       isDeleted: false,
@@ -57,13 +30,11 @@ export async function cascadeDeleteEmployee(
       );
     }
 
-    // 2. Balance'ni o'chirish (1:1 bog'liq)
     const deletedBalance = await Balance.deleteOne({ managerId: employeeId }).session(
       session || null
     );
     logger.debug(`✅ Balance o'chirildi: ${deletedBalance.deletedCount} ta`);
 
-    // 3. Expenses'ni logical delete (tarixiy ma'lumot saqlanadi)
     const updatedExpenses = await Expenses.updateMany(
       { managerId: employeeId, isActive: true },
       { $set: { isActive: false } }
@@ -72,7 +43,6 @@ export async function cascadeDeleteEmployee(
       `✅ Expenses deactivated: ${updatedExpenses.modifiedCount} ta`
     );
 
-    // 4. Payment.managerId → null (tarixiy ma'lumot saqlanadi)
     const updatedPayments = await Payment.updateMany(
       { managerId: employeeId },
       { $set: { managerId: null } }
@@ -81,7 +51,6 @@ export async function cascadeDeleteEmployee(
       `✅ Payment.managerId → null: ${updatedPayments.modifiedCount} ta`
     );
 
-    // 5. Notes.createBy → null (tarixiy ma'lumot saqlanadi)
     const updatedNotes = await Notes.updateMany(
       { createBy: employeeId },
       { $set: { createBy: null } }
@@ -90,7 +59,6 @@ export async function cascadeDeleteEmployee(
       `✅ Notes.createBy → null: ${updatedNotes.modifiedCount} ta`
     );
 
-    // 6. Debtor.createBy → null (tarixiy ma'lumot saqlanadi)
     const updatedDebtors = await Debtor.updateMany(
       { createBy: employeeId },
       { $set: { createBy: null } }
@@ -99,7 +67,6 @@ export async function cascadeDeleteEmployee(
       `✅ Debtor.createBy → null: ${updatedDebtors.modifiedCount} ta`
     );
 
-    // 7. Customer.editHistory.editedBy → null (tarixiy ma'lumot saqlanadi)
     const updatedCustomerHistory = await Customer.updateMany(
       { "editHistory.editedBy": employeeId },
       { $set: { "editHistory.$[elem].editedBy": null } },
@@ -109,7 +76,6 @@ export async function cascadeDeleteEmployee(
       `✅ Customer.editHistory updated: ${updatedCustomerHistory.modifiedCount} ta`
     );
 
-    // 8. Contract.editHistory.editedBy → null (tarixiy ma'lumot saqlanadi)
     const updatedContractHistory = await Contract.updateMany(
       { "editHistory.editedBy": employeeId },
       { $set: { "editHistory.$[elem].editedBy": null } },
@@ -126,16 +92,6 @@ export async function cascadeDeleteEmployee(
   }
 }
 
-/**
- * CASCADE: Customer o'chirilganda
- * 
- * Customer o'chirilganda quyidagilar yuz beradi:
- * 1. Contract → isDeleted = true (tarixiy ma'lumot saqlanadi)
- * 2. Payment → isDeleted = true (tarixiy ma'lumot saqlanadi)
- * 3. Notes → isDeleted = true (tarixiy ma'lumot saqlanadi)
- * 
- * ⚠️ MUHIM: Customer'da active contract bo'lsa, o'chirib bo'lmaydi!
- */
 export async function cascadeDeleteCustomer(
   customerId: string,
   session?: mongoose.ClientSession
@@ -143,7 +99,6 @@ export async function cascadeDeleteCustomer(
   try {
     logger.debug(`🗑️ CASCADE DELETE: Customer ${customerId}`);
 
-    // 1. Active contract'larni tekshirish
     const activeContractsCount = await Contract.countDocuments({
       customer: customerId,
       status: "active",
@@ -156,7 +111,6 @@ export async function cascadeDeleteCustomer(
       );
     }
 
-    // 2. Contract'larni logical delete
     const updatedContracts = await Contract.updateMany(
       { customer: customerId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } }
@@ -165,7 +119,6 @@ export async function cascadeDeleteCustomer(
       `✅ Contract logical delete: ${updatedContracts.modifiedCount} ta`
     );
 
-    // 3. Payment'larni logical delete (Customer bilan bog'liq)
     const updatedPayments = await Payment.updateMany(
       { customerId: customerId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } }
@@ -174,7 +127,6 @@ export async function cascadeDeleteCustomer(
       `✅ Payment logical delete: ${updatedPayments.modifiedCount} ta`
     );
 
-    // 4. Notes'ni logical delete
     const updatedNotes = await Notes.updateMany(
       { customer: customerId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } }
@@ -190,15 +142,6 @@ export async function cascadeDeleteCustomer(
   }
 }
 
-/**
- * CASCADE: Contract o'chirilganda
- * 
- * Contract o'chirilganda quyidagilar yuz beradi:
- * 1. Payment → isDeleted = true (tarixiy ma'lumot saqlanadi)
- * 2. Debtor → o'chiriladi (Debtor faqat active contract uchun)
- * 
- * ⚠️ MUHIM: Active contract bo'lsa, o'chirib bo'lmaydi!
- */
 export async function cascadeDeleteContract(
   contractId: string,
   session?: mongoose.ClientSession
@@ -206,10 +149,6 @@ export async function cascadeDeleteContract(
   try {
     logger.debug(`🗑️ CASCADE DELETE: Contract ${contractId}`);
 
-    // Note: Active contract check is done in contract.service.ts before calling this function
-    // Super Admin can delete active contracts
-
-    // 2. Payment'larni logical delete
     const updatedPayments = await Payment.updateMany(
       { contractId: contractId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } }
@@ -218,7 +157,6 @@ export async function cascadeDeleteContract(
       `✅ Payment logical delete: ${updatedPayments.modifiedCount} ta`
     );
 
-    // 3. Debtor'ni o'chirish (Debtor faqat active contract uchun kerak)
     const deletedDebtors = await Debtor.deleteMany({
       contractId: contractId,
     }).session(session || null);

@@ -303,13 +303,12 @@ class CustomerService {
         const [year, month, day] = filterDate.split("-").map(Number);
         filterEndDate = new Date(year, month - 1, day, 23, 59, 59, 999);
       } else {
-        // Default: bugungi kun
         filterEndDate = new Date();
         filterEndDate.setHours(23, 59, 59, 999);
       }
 
       const managerId = new Types.ObjectId(user.sub);
-      const currentDate = new Date(); // Hozirgi sana (reminderDate uchun)
+      const currentDate = new Date();
 
       const result = await Contract.aggregate([
         {
@@ -361,7 +360,6 @@ class CustomerService {
 
         {
           $addFields: {
-            // Barcha to'lanmagan to'lovlarni olish
             unpaidPayments: {
               $filter: {
                 input: "$paymentDetails",
@@ -373,8 +371,6 @@ class CustomerService {
         },
         {
           $addFields: {
-            // nextPaymentDate'ga mos payment'ni topish
-            // Sana taqqoslash muammosi bo'lsa - date range bilan
             nextPaymentData: {
               $arrayElemAt: [
                 {
@@ -383,7 +379,6 @@ class CustomerService {
                     as: "p",
                     cond: {
                       $and: [
-                        // Date'larni string formatda taqqoslash
                         {
                           $eq: [
                             {
@@ -414,10 +409,8 @@ class CustomerService {
         {
           $match: {
             $or: [
-              // reminderDate yo'q
               { "nextPaymentData.reminderDate": { $exists: false } },
               { "nextPaymentData.reminderDate": null },
-              // yoki reminderDate o'tgan (bugundan kichik yoki teng)
               { "nextPaymentData.reminderDate": { $lte: currentDate } },
             ],
           },
@@ -479,7 +472,7 @@ class CustomerService {
 
         {
           $project: {
-            _id: "$_id", // Contract ID
+            _id: "$_id",
             customerId: "$customerData._id",
             fullName: "$customerData.fullName",
             phoneNumber: "$customerData.phoneNumber",
@@ -491,11 +484,11 @@ class CustomerService {
             totalPrice: { $ifNull: ["$totalPrice", "$price"] },
             totalPaid: "$totalPaid",
             startDate: "$startDate",
-            initialPaymentDueDate: "$initialPaymentDueDate", // ✅ YANGI: Boshlang'ich to'lov sanasi
+            initialPaymentDueDate: "$initialPaymentDueDate",
             period: "$period",
             paidMonthsCount: "$paidMonthsCount",
-            monthlyPayment: "$monthlyPayment", // ✅ YANGI: Oylik to'lov
-            initialPayment: "$initialPayment", // ✅ YANGI: Boshlang'ich to'lov
+            monthlyPayment: "$monthlyPayment",
+            initialPayment: "$initialPayment",
             isPending: {
               $gt: [
                 {

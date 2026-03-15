@@ -4,10 +4,7 @@ import logger from "../../utils/logger";
 import auditLogService from "../../services/audit-log.service";
 
 class ResetController {
-  /**
-   * Barcha ma'lumotlarni tozalash
-   * POST /api/reset/all
-   */
+  
   async resetAll(req: Request, res: Response) {
     try {
       const user = req.user;
@@ -19,7 +16,6 @@ class ResetController {
         });
       }
 
-      // Ruxsatni tekshirish
       const permissionCheck = await resetService.canReset(user.sub);
       if (!permissionCheck.canReset) {
         return res.status(403).json({
@@ -28,7 +24,6 @@ class ResetController {
         });
       }
 
-      // Reset qilish
       const result = await resetService.resetAllData();
 
       await auditLogService.logResetAll(user.sub, req.ip);
@@ -43,10 +38,7 @@ class ResetController {
     }
   }
 
-  /**
-   * Reset statistikasini olish
-   * GET /api/reset/stats
-   */
+  
   async getStats(req: Request, res: Response) {
     try {
       const user = req.user;
@@ -58,7 +50,6 @@ class ResetController {
         });
       }
 
-      // Ruxsatni tekshirish
       const permissionCheck = await resetService.canReset(user.sub);
       if (!permissionCheck.canReset) {
         return res.status(403).json({
@@ -82,10 +73,7 @@ class ResetController {
     }
   }
 
-  /**
-   * Barcha shartnomalarning statusini tekshirish
-   * POST /api/reset/check-contracts
-   */
+  
   async checkContracts(req: Request, res: Response) {
     try {
       const user = req.user;
@@ -97,7 +85,6 @@ class ResetController {
         });
       }
 
-      // Ruxsatni tekshirish
       const permissionCheck = await resetService.canReset(user.sub);
       if (!permissionCheck.canReset) {
         return res.status(403).json({

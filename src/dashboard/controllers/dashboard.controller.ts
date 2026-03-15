@@ -13,15 +13,12 @@ class DashboardController {
   }
   async statistic(req: Request, res: Response, next: NextFunction) {
     try {
-      // Query parametridan range olish (daily, monthly, yearly)
       const range = (req.query.range as string) || "monthly";
 
-      // Validatsiya
       if (!["daily", "monthly", "yearly"].includes(range)) {
         return next(BaseError.BadRequest("Noto'g'ri range parametri"));
       }
 
-      // Service'dan ma'lumot olish
       const result = await dashboardService.statistic(range);
 
       res.status(200).json(result);

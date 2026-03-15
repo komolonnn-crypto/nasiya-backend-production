@@ -1,12 +1,8 @@
-/**
- * Payment Confirmation Service
- *
- * Kassa operatsiyalari - To'lovlarni tasdiqlash va rad etish
- * Extends PaymentBaseService for common functionality
- */
-
 import { PaymentBaseService } from "./payment.base.service";
+
 import Payment, {
+  ExcessHandling,
+  PaymentMethod,
   PaymentStatus,
   PaymentType,
 } from "../../../schemas/payment.schema";
@@ -15,23 +11,20 @@ import { Debtor } from "../../../schemas/debtor.schema";
 import Notes from "../../../schemas/notes.schema";
 import Customer from "../../../schemas/customer.schema";
 import Employee from "../../../schemas/employee.schema";
-import logger from "../../../utils/logger";
-import BaseError from "../../../utils/base.error";
-import IJwtUser from "../../../types/user";
-import { withTransaction } from "../../../utils/transaction.wrapper";
+
 import {
   PAYMENT_CONSTANTS,
   calculatePaymentAmounts,
   createAutoRejectionNote,
   isAmountPositive,
 } from "../../../utils/helpers/payment";
+import { withTransaction } from "../../../utils/transaction.wrapper";
+import BaseError from "../../../utils/base.error";
+import logger from "../../../utils/logger";
+
+import IJwtUser from "../../../types/user";
 
 export class PaymentConfirmationService extends PaymentBaseService {
-  /**
-   * To'lovni tasdiqlash (Kassa tomonidan)
-   * Requirements: 8.2, 8.3, 8.4
-   * ✅ ORTIQCHA TO'LOV BO'LSA, KEYINGI OYLAR UCHUN AVTOMATIK TO'LOVLAR YARATISH
-   */
   async confirmPayment(paymentId: string, user: IJwtUser) {
     return withTransaction(async (session) => {
       logger.debug("✅ === CONFIRMING PAYMENT (WITH TRANSACTION SUPPORT) ===");
@@ -57,7 +50,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
         throw BaseError.BadRequest("To'lov allaqachon tasdiqlangan");
       }
 
-      // Status aniqlash
       const actualAmount = payment.actualAmount || payment.amount;
       const expectedAmount = payment.expectedAmount || payment.amount;
 
@@ -79,13 +71,11 @@ export class PaymentConfirmationService extends PaymentBaseService {
         );
       }
 
-      // Payment'ni tasdiqlash
       payment.isPaid = true;
       payment.confirmedAt = new Date();
       payment.confirmedBy = user.sub as any;
       await payment.save();
 
-      // ✅ INITIAL to'lov tasdiqlanganida — Notes'ga aniq ma'lumot yozish
       if (payment.paymentType === PaymentType.INITIAL) {
         try {
           const confirmer = await Employee.findById(user.sub);
@@ -123,7 +113,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
         excessAmount: payment.excessAmount,
       });
 
-      // Contract topish
       const contract = await Contract.findOne({
         customer: payment.customerId,
         status: ContractStatus.ACTIVE,
@@ -133,7 +122,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
         throw BaseError.NotFoundError("Faol shartnoma topilmadi");
       }
 
-      // Payment'ni Contract.payments ga qo'shish (agar yo'q bo'lsa)
       if (!contract.payments) {
         contract.payments = [];
       }
@@ -151,12 +139,18 @@ export class PaymentConfirmationService extends PaymentBaseService {
 
       await contract.populate("payments");
 
-      // Ortiqcha to'lovni qayta ishlash
       const createdPayments = [];
+      let excessAmountForLog = 0;
+      let originalAmountForLog = 0;
+      let prepaidRecordIdForLog: string | undefined;
+
       if (payment.excessAmount && isAmountPositive(payment.excessAmount)) {
         const originalActualAmount = payment.actualAmount || payment.amount;
         const correctedActualAmount = payment.expectedAmount || payment.amount;
         const excessAmountValue = originalActualAmount - correctedActualAmount;
+
+        excessAmountForLog = excessAmountValue;
+        originalAmountForLog = originalActualAmount;
 
         payment.actualAmount = correctedActualAmount;
         payment.excessAmount = 0;
@@ -166,33 +160,90 @@ export class PaymentConfirmationService extends PaymentBaseService {
         logger.debug(
           `✅ Current payment actualAmount corrected: ${originalActualAmount} → ${payment.actualAmount}`,
         );
-        logger.debug(
-          `✅ Excess amount (${excessAmountValue.toFixed(2)} $) will be added to prepaid balance`,
-        );
 
-        // ✅ YANGI: Ortiqcha summani zapasga qo'shish (avtomatik to'lov yaratilmaydi)
-        await this.addToPrepaidBalance(excessAmountValue, contract);
+        if (payment.excessHandling === ExcessHandling.NEXT_MONTH) {
+          logger.debug(
+            `🔄 excessHandling=next_month: ${excessAmountValue.toFixed(2)}$ keyingi oyga o'tkaziladi`,
+          );
 
-        // ✅ YANGI: Ortiqcha summani PrepaidRecord'ga yozish (Zapas Tarixi)
-        await this.recordPrepaidTransaction(
-          excessAmountValue,
-          payment,
-          contract,
-          payment.paymentMethod,
-          payment.notes ? payment.notes.text : undefined,
-        );
-        // createdPayments.push(...result); // ❌ COMMENTED: Endi avtomatik to'lovlar yaratilmaydi
+          await contract.populate("payments");
+          const nextPayment = (contract.payments as any[])
+            .filter(
+              (p) =>
+                p.paymentType === PaymentType.MONTHLY &&
+                !p.isPaid &&
+                p.status === PaymentStatus.SCHEDULED &&
+                (p.targetMonth || 0) > (payment.targetMonth || 0),
+            )
+            .sort(
+              (a: any, b: any) => (a.targetMonth || 0) - (b.targetMonth || 0),
+            )[0];
+
+          if (nextPayment) {
+            const nextPaymentDoc = await Payment.findById(nextPayment._id);
+            if (nextPaymentDoc) {
+              const newAmount = Math.max(
+                0,
+                nextPaymentDoc.amount - excessAmountValue,
+              );
+              const newExpected = Math.max(
+                0,
+                (nextPaymentDoc.expectedAmount || nextPaymentDoc.amount) -
+                  excessAmountValue,
+              );
+              nextPaymentDoc.amount = newAmount;
+              nextPaymentDoc.expectedAmount = newExpected;
+              if (newAmount <= 0) {
+                nextPaymentDoc.isPaid = true;
+                nextPaymentDoc.status = PaymentStatus.PAID;
+                nextPaymentDoc.confirmedAt = new Date();
+                nextPaymentDoc.confirmedBy = payment.confirmedBy;
+              }
+              await nextPaymentDoc.save();
+              logger.debug(
+                `✅ Keyingi oy (${nextPaymentDoc.targetMonth}-oy) to'lovi kamaytirildi: ${excessAmountValue.toFixed(2)}$ → yangi summa: ${newAmount.toFixed(2)}$`,
+              );
+            }
+          } else {
+            logger.debug(
+              `⚠️ Keyingi SCHEDULED oy topilmadi — zapasga qo'shiladi`,
+            );
+            await this.addToPrepaidBalance(excessAmountValue, contract);
+            const prepaidRecord = await this.recordPrepaidTransaction(
+              excessAmountValue,
+              payment,
+              contract,
+              payment.paymentMethod,
+              payment.notes ? (payment.notes as any).text : undefined,
+            );
+            if (prepaidRecord?._id)
+              prepaidRecordIdForLog = prepaidRecord._id.toString();
+          }
+        } else {
+          logger.debug(
+            `💰 excessHandling=zapas: ${excessAmountValue.toFixed(2)}$ zapasga qo'shiladi`,
+          );
+          await this.addToPrepaidBalance(excessAmountValue, contract);
+
+          const prepaidRecord = await this.recordPrepaidTransaction(
+            excessAmountValue,
+            payment,
+            contract,
+            payment.paymentMethod,
+            payment.notes ? (payment.notes as any).text : undefined,
+          );
+          if (prepaidRecord?._id) {
+            prepaidRecordIdForLog = prepaidRecord._id.toString();
+          }
+        }
       }
 
       await contract.save();
 
-      // ✅ YANGI: INITIAL to'lov tasdiqlanganida — oylik to'lovlar qayta hisoblanadi
       if (payment.paymentType === PaymentType.INITIAL) {
         const confirmedInitialAmount = payment.actualAmount || payment.amount;
 
         if (contract.period > 0 && contract.price > 0) {
-          // ✅ TO'G'RI FORMULA: price (foizsiz) va percentage dan hisoblash
-          // monthlyPayment = (price - initialPayment) * (1 + percentage/100) / period
           const remainingAfterInitial = contract.price - confirmedInitialAmount;
           const percentage = contract.percentage ?? 0;
           const amountWithInterest =
@@ -224,13 +275,11 @@ export class PaymentConfirmationService extends PaymentBaseService {
               },
             );
 
-            // Shartnomani yangilash
             contract.initialPayment = confirmedInitialAmount;
             contract.monthlyPayment = newMonthlyPayment;
             contract.totalPrice = newTotalPrice;
             await contract.save();
 
-            // Barcha to'lanmagan SCHEDULED oylik to'lovlarni yangilash
             const unpaidMonthlyIds = (contract.payments as any[])
               .filter(
                 (p) =>
@@ -263,16 +312,11 @@ export class PaymentConfirmationService extends PaymentBaseService {
           }
         }
       }
-
-      // ✅ TUZATISH: nextPaymentDate ni to'g'ri hisoblash
-      // Eng oxirgi to'langan oydan keyingi oyga o'rnatish
       if (payment.paymentType === PaymentType.MONTHLY) {
-        // Barcha to'lovlarni olish va to'langan oylarni aniqlash
         const allPayments = await Payment.find({
           _id: { $in: contract.payments },
         }).sort({ targetMonth: 1 });
 
-        // Eng oxirgi to'langan oyni topish
         const paidPayments = allPayments.filter((p) => p.isPaid);
         const lastPaidMonth =
           paidPayments.length > 0 ?
@@ -286,25 +330,19 @@ export class PaymentConfirmationService extends PaymentBaseService {
           period: contract.period,
         });
 
-        // Keyingi to'lov oyi
         const nextPaymentMonth = lastPaidMonth + 1;
 
-        // Agar barcha oylar to'langan bo'lsa, contract COMPLETED
         if (nextPaymentMonth > contract.period) {
           logger.debug("✅ Barcha oylar to'landi - shartnoma yakunlanadi");
-          // checkContractCompletion bu holatni hal qiladi
         } else {
-          // nextPaymentDate ni hisoblash
           const startDate = new Date(contract.startDate);
           const originalDay =
             contract.originalPaymentDay || startDate.getDate();
 
-          // Keyingi to'lov sanasini hisoblash
           const newNextPaymentDate = new Date(startDate);
           newNextPaymentDate.setMonth(startDate.getMonth() + nextPaymentMonth);
-          // Kun to'g'riligi (oyning oxirgi kunidan oshib ketmaslik)
           if (newNextPaymentDate.getDate() !== originalDay) {
-            newNextPaymentDate.setDate(0); // Oyning oxirgi kuni
+            newNextPaymentDate.setDate(0);
           }
 
           logger.debug("📅 nextPaymentDate yangilandi:", {
@@ -319,13 +357,11 @@ export class PaymentConfirmationService extends PaymentBaseService {
 
           contract.nextPaymentDate = newNextPaymentDate;
 
-          // Agar originalPaymentDay undefined bo'lsa, o'rnatish
           if (!contract.originalPaymentDay) {
             contract.originalPaymentDay = originalDay;
             logger.debug("📅 originalPaymentDay o'rnatildi:", originalDay);
           }
 
-          // Kechiktirilgan ma'lumotlarni tozalash (agar mavjud bo'lsa)
           if (contract.previousPaymentDate || contract.postponedAt) {
             contract.previousPaymentDate = undefined;
             contract.postponedAt = undefined;
@@ -334,14 +370,33 @@ export class PaymentConfirmationService extends PaymentBaseService {
         }
       }
 
+      if (payment.paymentMethod === PaymentMethod.FROM_ZAPAS) {
+        const zapasAmount = payment.actualAmount || payment.amount;
+        if (
+          (contract.prepaidBalance || 0) <
+          zapasAmount - PAYMENT_CONSTANTS.TOLERANCE
+        ) {
+          throw BaseError.BadRequest(
+            `Zapas balansi yetarli emas (mavjud: $${(contract.prepaidBalance || 0).toFixed(2)}, kerak: $${zapasAmount.toFixed(2)})`,
+          );
+        }
+        contract.prepaidBalance = Math.max(
+          0,
+          (contract.prepaidBalance || 0) - zapasAmount,
+        );
+        await contract.save();
+        logger.debug(
+          `💰 Zapasdan to'landi: ${zapasAmount.toFixed(2)}$, qolgan zapas: ${contract.prepaidBalance.toFixed(2)}$`,
+        );
+      }
+
       await contract.save();
       logger.debug("💾 Contract saved with updated nextPaymentDate");
 
-      // ✅ TUZATILDI: To'lov qilinganda o'sha oy VA oldingi barcha oylarning eslatmalarini o'chirish
       if (payment.targetMonth) {
         const deletedReminders = await Payment.deleteMany({
           customerId: payment.customerId,
-          targetMonth: { $lte: payment.targetMonth }, // ✅ O'sha oy va oldingi oylar
+          targetMonth: { $lte: payment.targetMonth },
           isReminderNotification: true,
           isPaid: false,
         });
@@ -353,11 +408,9 @@ export class PaymentConfirmationService extends PaymentBaseService {
         }
       }
 
-      // Audit log yaratish - customerName va paymentCreator bilan
       const customer = await Customer.findById(payment.customerId);
       const customerName = customer?.fullName || "Noma'lum mijoz";
 
-      // ✅ YANGI: Pulni yig'ib to'lovni qilgan odamni olish (managerId)
       await payment.populate("managerId");
       const paymentCreator = payment.managerId as any;
       const paymentCreatorName =
@@ -383,42 +436,46 @@ export class PaymentConfirmationService extends PaymentBaseService {
           },
         ],
         metadata: {
-          customerName, // ✅ Mijoz ismi
-          contractId: contract.customId, // ✅ YANGI: Shartnoma ID
+          customerName,
+          contractId: contract.customId,
           paymentType: "monthly",
           paymentStatus: payment.status,
-          paymentMethod: payment.paymentMethod, // ✅ YANGI: To'lov usuli
+          paymentMethod: payment.paymentMethod,
           amount: payment.actualAmount || payment.amount,
           targetMonth: payment.targetMonth,
-          paymentCreatorId: paymentCreator?._id?.toString(), // ✅ YANGI: To'lov qilgan odam ID
-          paymentCreatorName, // ✅ YANGI: To'lov qilgan odam ismi
+          paymentCreatorId: paymentCreator?._id?.toString(),
+          paymentCreatorName,
+          ...(excessAmountForLog > 0 && {
+            originalAmount: originalAmountForLog,
+            excessAmount: excessAmountForLog,
+            prepaidRecordId: prepaidRecordIdForLog,
+          }),
         },
       });
 
-      // Balance yangilash
       const confirmedActualAmount = payment.actualAmount || payment.amount;
-      await this.updateBalance(
-        payment.managerId.toString(),
-        {
-          dollar: confirmedActualAmount,
-          sum: 0,
-        },
-        session,
-        user.sub,
-        {
-          customerName,
-          contractId: contract.customId,
-          paymentType: payment.paymentType,
-        },
-      );
+      if (payment.paymentMethod !== PaymentMethod.FROM_ZAPAS) {
+        await this.updateBalance(
+          payment.managerId.toString(),
+          {
+            dollar: confirmedActualAmount,
+            sum: 0,
+          },
+          session,
+          user.sub,
+          {
+            customerName,
+            contractId: contract.customId,
+            paymentType: payment.paymentType,
+          },
+        );
+      }
 
       logger.debug(
         "💵 Balance updated with actualAmount:",
         confirmedActualAmount,
       );
 
-      // ✅ YANGI LOGIKA: Debtor faqat barcha muddati o'tgan to'lovlar to'langanda o'chirilsin
-      // Barcha to'lovlarni olish
       const allPayments = await Payment.find({
         _id: { $in: contract.payments },
       });
@@ -426,7 +483,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Muddati o'tgan va to'lanmagan to'lovlarni hisoblash
       const overdueUnpaidPayments = allPayments.filter(
         (p) => !p.isPaid && new Date(p.date) < today,
       );
@@ -437,7 +493,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
         contractId: contract._id,
       });
 
-      // ✅ Faqat muddati o'tgan to'lanmagan to'lovlar yo'q bo'lsa, Debtor o'chirish
       if (overdueUnpaidPayments.length === 0) {
         const deletedDebtors = await Debtor.deleteMany({
           contractId: contract._id,
@@ -454,8 +509,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
           `⚠️ Debtor NOT deleted - still has ${overdueUnpaidPayments.length} overdue unpaid payment(s)`,
         );
 
-        // ✅ BONUS: Debtor ma'lumotlarini yangilash (overdueDays, debtAmount)
-        // Eng birinchi muddati o'tgan to'lovni topish
         const firstOverduePayment = overdueUnpaidPayments.sort(
           (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
         )[0];
@@ -466,7 +519,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
               (1000 * 60 * 60 * 24),
           );
 
-          // Debtor'ni yangilash
           await Debtor.updateMany(
             { contractId: contract._id },
             {
@@ -489,12 +541,10 @@ export class PaymentConfirmationService extends PaymentBaseService {
         }
       }
 
-      // Contract completion tekshirish
       await this.checkContractCompletion(String(contract._id));
 
       logger.debug("✅ Payment confirmed successfully");
 
-      // Database notification yaratish
       try {
         const customer = await Customer.findById(payment.customerId);
 
@@ -536,10 +586,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
     });
   }
 
-  /**
-   * To'lovni rad etish (Kassa tomonidan)
-   * Requirements: 8.5
-   */
   async rejectPayment(paymentId: string, reason: string, user: IJwtUser) {
     return withTransaction(async (session) => {
       logger.debug("❌ === REJECTING PAYMENT (WITH TRANSACTION) ===");
@@ -556,17 +602,14 @@ export class PaymentConfirmationService extends PaymentBaseService {
         throw BaseError.BadRequest("Tasdiqlangan to'lovni rad etib bo'lmaydi");
       }
 
-      // Payment status'ni o'zgartirish
       payment.status = PaymentStatus.REJECTED;
       await payment.save();
 
-      // Notes'ga rad etish sababini qo'shish
       if (payment.notes) {
         payment.notes.text += `\n[RAD ETILDI: ${reason}]`;
         await payment.notes.save();
       }
 
-      // Payment'ni Contract.payments dan o'chirish
       const contract = await Contract.findOne({
         customer: payment.customerId,
         status: ContractStatus.ACTIVE,
@@ -587,7 +630,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
 
       logger.debug("✅ Payment rejected successfully");
 
-      // Audit log yaratish
       const customer = await Customer.findById(payment.customerId);
       const customerName = customer?.fullName || "Noma'lum mijoz";
 
@@ -614,8 +656,8 @@ export class PaymentConfirmationService extends PaymentBaseService {
           { field: "reason", oldValue: null, newValue: reason },
         ],
         metadata: {
-          customerName, // ✅ Mijoz ismi
-          contractId: contract?.customId, // ✅ YANGI: Shartnoma ID
+          customerName,
+          contractId: contract?.customId,
           paymentType: "monthly",
           paymentStatus: PaymentStatus.REJECTED,
           paymentMethod: payment.paymentMethod,
@@ -626,7 +668,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
         },
       });
 
-      // Database notification yaratish
       try {
         if (customer && contract) {
           const botNotificationService = (
@@ -662,10 +703,6 @@ export class PaymentConfirmationService extends PaymentBaseService {
     });
   }
 
-  /**
-   * PENDING to'lovlarni tekshirish va muddati o'tganlarni avtomatik rad etish
-   * Requirements: 9.1 - PENDING to'lovlar timeout
-   */
   async checkAndRejectExpiredPayments(): Promise<{
     rejectedCount: number;
     rejectedPaymentIds: string[];

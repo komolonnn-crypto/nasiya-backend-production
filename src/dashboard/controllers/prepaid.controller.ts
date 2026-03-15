@@ -1,7 +1,4 @@
-/**
- * Prepaid Controller
- * Zapas Tarihi (Prepaid Records) logikasi
- */
+
 
 import { Request, Response } from "express";
 import PrepaidRecord from "../../schemas/prepaid-record.schema";
@@ -10,10 +7,7 @@ import logger from "../../utils/logger";
 import IJwtUser from "../../types/user";
 
 class PrepaidController {
-  /**
-   * Mijozning zapas tarihini olish
-   * GET /api/dashboard/prepaid/history/:customerId
-   */
+  
   async getPrepaidHistory(req: Request, res: Response) {
     try {
       const { customerId } = req.params;
@@ -59,10 +53,7 @@ class PrepaidController {
     }
   }
 
-  /**
-   * Shartnoma bo'yicha zapas tarihini olish
-   * GET /api/dashboard/prepaid/contract/:contractId
-   */
+  
   async getPrepaidByContract(req: Request, res: Response) {
     try {
       const { contractId } = req.params;
@@ -108,14 +99,7 @@ class PrepaidController {
     }
   }
 
-  /**
-   * Jami zapas statistikasi
-   * GET /api/dashboard/prepaid/stats/:customerId
-   *
-   * ⚠️ MUAMMO 2 JA'I: totalPrepaid ikkita manbadan xisoblanadi
-   * 1. PrepaidRecords dan (yangi zapazlar)
-   * 2. Contract.prepaidBalance dan (qancha pul qolganini)
-   */
+  
   async getPrepaidStats(req: Request, res: Response) {
     try {
       const { customerId } = req.params;
@@ -126,22 +110,18 @@ class PrepaidController {
         requestedBy: user?.sub,
       });
 
-      // Prepaid records dan total xisobla
       const records = await PrepaidRecord.find({ customer: customerId }).lean();
       const totalPrepaidFromRecords = records.reduce(
         (sum, r) => sum + r.amount,
         0,
       );
 
-      // Contract.prepaidBalance dan total xisobla
       const contracts = await Contract.find({ customer: customerId }).lean();
       const totalPrepaidFromContracts = contracts.reduce(
         (sum, c) => sum + (c.prepaidBalance || 0),
         0,
       );
 
-      // Ikkita manbadan maksimumni ol
-      // Chunki ma'lumotlar zid tushib ketishi mumkin
       const totalPrepaid = Math.max(
         totalPrepaidFromRecords,
         totalPrepaidFromContracts,
@@ -166,7 +146,6 @@ class PrepaidController {
           : null,
       };
 
-      // To'lov usuliga qarab guruhlash
       for (const record of records) {
         const method = record.paymentMethod || "unknown";
         if (!stats.byPaymentMethod[method]) {
@@ -192,10 +171,26 @@ class PrepaidController {
     }
   }
 
-  /**
-   * Prepaid record'ni o'chirish (admin uchun)
-   * DELETE /api/dashboard/prepaid/:recordId
-   */
+  
+  async getContractBalance(req: Request, res: Response) {
+    try {
+      const { contractId } = req.params;
+      const contract = await Contract.findById(contractId).select("prepaidBalance").lean();
+      res.json({
+        success: true,
+        prepaidBalance: contract?.prepaidBalance || 0,
+      });
+    } catch (error) {
+      logger.error("❌ Error getting contract prepaid balance:", error);
+      res.status(500).json({
+        success: false,
+        message: "Zapas balansini olishda xatolik",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  
   async deletePrepaidRecord(req: Request, res: Response) {
     try {
       const { recordId } = req.params;
@@ -235,10 +230,7 @@ class PrepaidController {
     }
   }
 
-  /**
-   * Prepaid record'ni yangilash (izohni o'zgartirish uchun)
-   * PATCH /api/dashboard/prepaid/:recordId
-   */
+  
   async updatePrepaidRecord(req: Request, res: Response) {
     try {
       const { recordId } = req.params;
@@ -290,10 +282,7 @@ class PrepaidController {
     }
   }
 
-  /**
-   * Barcha prepaid record'larni olish (admin uchun)
-   * GET /api/dashboard/prepaid/all
-   */
+  
   async getAllPrepaidRecords(req: Request, res: Response) {
     try {
       const user = req.user as IJwtUser;

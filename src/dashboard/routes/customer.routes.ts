@@ -49,7 +49,6 @@ router.post(
   customerController.create,
 );
 
-// seller
 router.post(
   "/seller",
   checkPermission(Permission.CUSTOMER_CREATE_MANAGER),
@@ -64,22 +63,12 @@ router.put(
   customerController.update,
 );
 
-// ========================================
-// 🔥 HARD DELETE CUSTOMER (PERMANENT)
-// ONLY: admin, moderator
-// ⚠️ WARNING: This action is IRREVERSIBLE!
-// ========================================
 router.delete(
   "/hard-delete/:id",
   checkPermission(Permission.DELETE_CUSTOMER),
   customerController.hardDeleteCustomer,
 );
 
-// ========================================
-// 🔥 BULK HARD DELETE CUSTOMERS (PERMANENT)
-// ONLY: admin, moderator
-// ⚠️ WARNING: This action is IRREVERSIBLE!
-// ========================================
 router.delete(
   "/bulk-hard-delete",
   checkPermission(Permission.DELETE_CUSTOMER),

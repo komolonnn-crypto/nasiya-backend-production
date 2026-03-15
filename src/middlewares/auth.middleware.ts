@@ -27,7 +27,6 @@ export const authenticate = async (
       return next(BaseError.UnauthorizedError("Access token yo'q"));
     }
 
-    // 🔧 DEVELOPMENT: Mock token bypass
     if (process.env.NODE_ENV === "development" && accessToken.startsWith("mock_token_")) {
       const Employee = (await import("../schemas/employee.schema")).default;
       const employeeId = accessToken.replace("mock_token_", "");

@@ -10,7 +10,6 @@ import { Types } from "mongoose";
 import logger from "../../utils/logger";
 
 class ContractService {
-  // To'lovlarni qayta hisoblash funksiyasi
   async recalculatePayments(
     contractId: string,
     newMonthlyPayment: number,
@@ -28,7 +27,6 @@ class ContractService {
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
 
-      // Birinchi to'lov (initial payment) ni yangilash
       if (newInitialPayment && payments[0]) {
         const firstPayment = await Payment.findById(payments[0]._id);
         if (firstPayment) {
@@ -40,7 +38,6 @@ class ContractService {
         }
       }
 
-      // Oylik to'lovlarni tekshirish va yangilash
       for (let i = 1; i < payments.length; i++) {
         const payment = await Payment.findById(payments[i]._id);
         if (!payment) continue;
@@ -48,16 +45,13 @@ class ContractService {
         payment.expectedAmount = newMonthlyPayment;
 
         if (payment.isPaid) {
-          // To'langan to'lovni tekshirish
           const diff = payment.amount - newMonthlyPayment;
 
           if (Math.abs(diff) < 0.01) {
-            // To'g'ri to'langan
             payment.status = PaymentStatus.PAID;
             payment.remainingAmount = 0;
             payment.excessAmount = 0;
           } else if (diff < 0) {
-            // Kam to'langan
             payment.status = PaymentStatus.UNDERPAID;
             payment.remainingAmount = Math.abs(diff);
             payment.excessAmount = 0;
@@ -65,7 +59,6 @@ class ContractService {
               `⚠️ Payment ${i} underpaid: ${payment.amount} < ${newMonthlyPayment}, remaining: ${payment.remainingAmount}`
             );
           } else {
-            // Ko'p to'langan
             payment.status = PaymentStatus.OVERPAID;
             payment.excessAmount = diff;
             payment.remainingAmount = 0;
@@ -74,7 +67,6 @@ class ContractService {
             );
           }
         } else {
-          // To'lanmagan - yangi oylik bilan yangilash
           payment.amount = newMonthlyPayment;
           payment.status = PaymentStatus.PENDING;
           payment.remainingAmount = 0;
@@ -91,7 +83,6 @@ class ContractService {
     }
   }
 
-  // Balansni yangilash funksiyasi
   async updateBalance(
     managerId: any,
     changes: {
@@ -117,7 +108,6 @@ class ContractService {
     return await balance.save();
   }
 
-  // Faol shartnomalarni ko'rish
   async getActiveContracts(userId: string) {
     logger.debug("🔍 Getting active contracts for user:", userId);
     const result = await Contract.aggregate([
@@ -193,7 +183,6 @@ class ContractService {
     return result;
   }
 
-  // Yangi shartnomalarni ko'rish
   async getNewContracts(userId: string) {
     logger.debug("🔍 Getting new contracts for user:", userId);
     const result = await Contract.aggregate([
@@ -266,7 +255,6 @@ class ContractService {
     return result;
   }
 
-  // Yopilgan shartnomalarni ko'rish
   async getCompletedContracts(userId: string) {
     return await Contract.aggregate([
       {
@@ -328,7 +316,6 @@ class ContractService {
     ]);
   }
 
-  // Shartnoma detailini ko'rish
   async getContractById(contractId: string, userId: string) {
     const contract = await Contract.aggregate([
       {
@@ -445,7 +432,6 @@ class ContractService {
           },
         },
       },
-      // ✅ editHistory.editedBy ni populate qilish
       {
         $lookup: {
           from: "employees",
@@ -504,7 +490,6 @@ class ContractService {
     return contract[0];
   }
 
-  // Shartnomani tahrirlash (CASCADE UPDATE)
   async updateContract(contractId: string, data: any, userId: string) {
     try {
       logger.debug("🔄 === CONTRACT UPDATE STARTED ===");
@@ -533,14 +518,12 @@ class ContractService {
         monthlyPayment: data.monthlyPayment,
       });
 
-      // 1. Initial Payment o'zgarganini tekshirish
       const oldInitialPayment = contract.initialPayment || 0;
       const newInitialPayment = data.initialPayment || 0;
       const initialPaymentDiff = newInitialPayment - oldInitialPayment;
 
       logger.debug("💰 Initial payment difference:", initialPaymentDiff);
 
-      // 2. Agar initial payment o'zgargan bo'lsa, Payment collection'ni yangilash
       if (
         initialPaymentDiff !== 0 &&
         contract.payments &&
@@ -548,7 +531,6 @@ class ContractService {
       ) {
         const Payment = await import("../../schemas/payment.schema");
 
-        // Birinchi to'lovni topish (initial payment)
         const firstPayment = await Payment.default.findById(
           contract.payments[0]
         );
@@ -562,7 +544,6 @@ class ContractService {
             `✅ Initial payment updated: ${oldAmount} -> ${newInitialPayment}`
           );
 
-          // 3. Balance'ni yangilash
           const customer = await Customer.findById(contract.customer).populate(
             "manager"
           );
@@ -578,7 +559,6 @@ class ContractService {
         }
       }
 
-      // 4. Monthly payment o'zgarganini tekshirish va Debtor'ni yangilash
       const oldMonthlyPayment = contract.monthlyPayment || 0;
       const newMonthlyPayment = data.monthlyPayment || 0;
 
@@ -587,21 +567,18 @@ class ContractService {
           `📅 Monthly payment changed: ${oldMonthlyPayment} -> ${newMonthlyPayment}`
         );
 
-        // Debtor'ni yangilash
         await Debtor.updateMany(
           { contractId: contract._id },
           { debtAmount: newMonthlyPayment }
         );
         logger.debug("⚠️ Debtors updated with new monthly payment");
 
-        // To'lovlarni qayta hisoblash
         await this.recalculatePayments(
           String(contract._id),
           newMonthlyPayment,
           initialPaymentDiff !== 0 ? newInitialPayment : undefined
         );
       } else if (initialPaymentDiff !== 0) {
-        // Faqat initial payment o'zgargan bo'lsa
         await this.recalculatePayments(
           String(contract._id),
           newMonthlyPayment,
@@ -609,17 +586,14 @@ class ContractService {
         );
       }
 
-      // 5. Notes yangilash
       if (data.notes && contract.notes) {
         contract.notes.text = data.notes;
         await contract.notes.save();
       }
 
-      // 6. Keyingi to'lov sanasini hisoblash (startDate dan 1 oy keyin)
       const nextPaymentDate = new Date(contract.startDate);
       nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
 
-      // 7. Shartnoma ma'lumotlarini yangilash
       const updatedContract = await Contract.findOneAndUpdate(
         { _id: contractId, isDeleted: false },
         {
@@ -689,7 +663,6 @@ class ContractService {
       }
       logger.debug("👤 Seller found:", createBy._id);
 
-      // Notes yaratish
       const newNotes = new Notes.default({
         text: data.notes || "Shartnoma yaratildi (Tasdiq kutilmoqda)",
         customer: data.customer,
@@ -698,12 +671,10 @@ class ContractService {
       await newNotes.save();
       logger.info("📝 Notes created:", newNotes._id);
 
-      // Shartnoma yaratish - isActive: false (tasdiq kutilmoqda)
       const contractStartDate = data.startDate
         ? new Date(data.startDate)
         : new Date();
 
-      // ✅ YANGI: customId generate qilish (agar berilmagan bo'lsa)
       let finalCustomId = (data as any).customId;
       if (!finalCustomId) {
         const year = new Date().getFullYear().toString().slice(-2);
@@ -715,7 +686,7 @@ class ContractService {
 
       const contract = new Contract({
         customer: data.customer,
-        customId: finalCustomId, // ✅ YANGI: Custom ID (generate qilingan yoki berilgan)
+        customId: finalCustomId,
         productName: data.productName,
         originalPrice: data.originalPrice,
         price: data.price,
@@ -734,7 +705,7 @@ class ContractService {
           nextDate.setMonth(nextDate.getMonth() + 1);
           return nextDate;
         })(),
-        isActive: false, // ⚠️ Tasdiq kutilmoqda
+        isActive: false,
         createBy: createBy._id,
         info: {
           box: data.box || false,

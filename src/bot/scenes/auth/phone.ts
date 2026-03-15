@@ -60,7 +60,6 @@ phoneScene.on("contact", async (ctx) => {
         return;
       }
 
-      // Telegram ID'ni saqlash
       employee.telegramId = telegramId.toString();
       await employee.save();
 

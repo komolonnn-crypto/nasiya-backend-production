@@ -4,7 +4,6 @@ import BaseError from "../../utils/base.error";
 import logger from "../../utils/logger";
 
 class CashController {
-
   async getAll(req: Request, res: Response, next: NextFunction) {
     try {
  
@@ -23,15 +22,11 @@ class CashController {
     }
   }
 
-
   async confirmations(req: Request, res: Response, next: NextFunction) {
     try {
-
-
       const user = req.user;
       const { cashIds } = req.body;
 
-      // Validation
       if (!user) {
         throw BaseError.UnauthorizedError(
           "Foydalanuvchi autentifikatsiya qilinmagan"
@@ -58,7 +53,6 @@ class CashController {
 
   async getPendingPayments(req: Request, res: Response, next: NextFunction) {
     try {
-
       const data = await cashService.getPendingPayments();
 
       if (data.length > 0) {
@@ -70,7 +64,6 @@ class CashController {
         });
       }
 
-      // Response format standardizatsiya
       return res.status(200).json({
         success: true,
         message: "Pending to'lovlar muvaffaqiyatli olindi",
@@ -83,21 +76,17 @@ class CashController {
     }
   }
 
-
   async confirmPayments(req: Request, res: Response, next: NextFunction) {
     try {
-
       const user = req.user;
       const { paymentIds } = req.body;
 
-      // Validation
       if (!user) {
         throw BaseError.UnauthorizedError(
           "Foydalanuvchi autentifikatsiya qilinmagan"
         );
       }
 
-      // Role tekshiruvi - SELLER tasdiqlashi mumkin emas
       if (user.role === "seller") {
         throw BaseError.ForbiddenError(
           "Seller to'lovlarni tasdiqlashi mumkin emas"
@@ -112,11 +101,8 @@ class CashController {
         throw BaseError.BadRequest("To'lov ID lari kiritilmagan");
       }
 
-
-
       const data = await cashService.confirmPayments(paymentIds, user);
 
-      // Response format standardizatsiya
       return res.status(200).json({
         success: data.success,
         message: data.message,
@@ -129,21 +115,17 @@ class CashController {
     }
   }
 
-
   async rejectPayment(req: Request, res: Response, next: NextFunction) {
     try {
-
       const user = req.user;
       const { paymentId, reason } = req.body;
 
-      // Validation
       if (!user) {
         throw BaseError.UnauthorizedError(
           "Foydalanuvchi autentifikatsiya qilinmagan"
         );
       }
 
-      // Role tekshiruvi - SELLER rad etishi mumkin emas
       if (user.role === "seller") {
         throw BaseError.ForbiddenError(
           "Seller to'lovlarni rad etishi mumkin emas"
@@ -157,7 +139,6 @@ class CashController {
       if (!reason || reason.trim().length === 0) {
         throw BaseError.BadRequest("Rad etish sababi kiritilmagan");
       }
-
 
       const data = await cashService.rejectPayment(paymentId, reason, user);
 

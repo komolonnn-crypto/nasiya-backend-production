@@ -14,8 +14,8 @@ export interface INotification extends Document {
     productName: string;
     amount: number;
     status: string;
-    paymentType?: 'FULL' | 'PARTIAL' | 'EXCESS'; // To'lov turi
-    monthNumber?: number; // Qaysi oy uchun to'lov
+    paymentType?: 'FULL' | 'PARTIAL' | 'EXCESS';
+    monthNumber?: number;
   };
   isRead: boolean;
   createdAt: Date;
@@ -95,7 +95,6 @@ const notificationSchema = new Schema<INotification>(
   }
 );
 
-// Index for faster queries
 notificationSchema.index({ managerId: 1, createdAt: -1 });
 notificationSchema.index({ managerId: 1, isRead: 1 });
 

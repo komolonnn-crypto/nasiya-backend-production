@@ -1,20 +1,8 @@
-/**
- * Payment Status Helper
- * 
- * To'lov statusini hisoblash uchun helper funksiyalar
- * DRY principle - kod takrorlanishini bartaraf etish
- */
+
 
 import { PaymentStatus } from "../../../schemas/payment.schema";
 import { PAYMENT_CONSTANTS } from "./payment-constants";
 
-/**
- * To'lov statusini hisoblash
- * 
- * @param actualAmount - Haqiqatda to'langan summa
- * @param expectedAmount - Kutilgan summa
- * @returns PaymentStatus (PAID, UNDERPAID, OVERPAID)
- */
 export const calculatePaymentStatus = (
   actualAmount: number,
   expectedAmount: number
@@ -33,13 +21,6 @@ export const calculatePaymentStatus = (
   return PaymentStatus.OVERPAID;
 };
 
-/**
- * To'lov summalarini hisoblash
- * 
- * @param actualAmount - Haqiqatda to'langan summa
- * @param expectedAmount - Kutilgan summa
- * @returns Object with remainingAmount and excessAmount
- */
 export const calculatePaymentAmounts = (
   actualAmount: number,
   expectedAmount: number
@@ -72,14 +53,6 @@ export const calculatePaymentAmounts = (
   };
 };
 
-/**
- * Prepaid balance'dan foydalanish
- * 
- * @param actualAmount - Haqiqatda to'langan summa
- * @param expectedAmount - Kutilgan summa
- * @param prepaidBalance - Mavjud prepaid balance
- * @returns Updated amounts with prepaid usage
- */
 export const applyPrepaidBalance = (
   actualAmount: number,
   expectedAmount: number,
@@ -101,12 +74,6 @@ export const applyPrepaidBalance = (
   };
 };
 
-/**
- * To'lov validatsiyasi
- * 
- * @param amount - To'lov summasi
- * @throws Error if invalid
- */
 export const validatePaymentAmount = (amount: number): void => {
   if (!amount || amount <= 0) {
     throw new Error(PAYMENT_CONSTANTS.MIN_PAYMENT_AMOUNT + " dan katta bo'lishi kerak");
@@ -117,23 +84,10 @@ export const validatePaymentAmount = (amount: number): void => {
   }
 };
 
-/**
- * Ikki summani solishtirishish (tolerance bilan)
- * 
- * @param amount1 - Birinchi summa
- * @param amount2 - Ikkinchi summa
- * @returns true if equal within tolerance
- */
 export const areAmountsEqual = (amount1: number, amount2: number): boolean => {
   return Math.abs(amount1 - amount2) < PAYMENT_CONSTANTS.TOLERANCE;
 };
 
-/**
- * Summani tekshirish (> 0 yoki >=)
- * 
- * @param amount - Summa
- * @returns true if amount > tolerance
- */
 export const isAmountPositive = (amount: number): boolean => {
   return amount > PAYMENT_CONSTANTS.TOLERANCE;
 };

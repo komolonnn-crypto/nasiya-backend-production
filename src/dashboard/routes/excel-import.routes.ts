@@ -6,7 +6,6 @@ import { Permission } from "../../enums/permission.enum";
 
 const router = Router();
 
-// Excel fayl uchun upload middleware
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
@@ -31,15 +30,10 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024,
   },
 });
 
-/**
- * POST /api/excel/import
- * Excel faylni upload qilish va import qilish
- * Faqat admin va moderator ruxsati bor
- */
 router.post(
   "/import",
   checkPermission(Permission.CREATE_CUSTOMER),

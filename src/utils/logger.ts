@@ -1,7 +1,4 @@
-/**
- * Logger utility for conditional logging based on environment
- * In production, logs are disabled by default unless ENABLE_LOGS is set to 'true'
- */
+
 
 const isDevelopment = process.env.NODE_ENV === "development";
 const isLoggingEnabled = process.env.ENABLE_LOGS === "true" || isDevelopment;
@@ -14,7 +11,6 @@ export const logger = {
   },
 
   error: (...args: any[]) => {
-    // Always log errors, even in production
     console.error(...args);
   },
 

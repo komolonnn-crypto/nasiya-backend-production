@@ -6,15 +6,8 @@ import Notes from "../../schemas/notes.schema";
 import IJwtUser from "../../types/user";
 import logger from "../../utils/logger";
 
-/**
- * Payment Creator Helper
- * To'lov yaratish uchun yordamchi funksiyalar
- */
 export class PaymentCreatorHelper {
-  /**
-   * Oylik to'lov yaratish
-   * @param data - To'lov ma'lumotlari
-   */
+  
   static async createMonthlyPayment(data: {
     monthNumber: number;
     amount: number;
@@ -38,7 +31,6 @@ export class PaymentCreatorHelper {
       isPaid = true,
     } = data;
 
-    // Status aniqlash
     let paymentStatus: PaymentStatus;
     let shortageAmount = 0;
 
@@ -49,7 +41,6 @@ export class PaymentCreatorHelper {
       shortageAmount = monthlyPayment - actualAmount;
     }
 
-    // Notes yaratish
     let finalNoteText =
       noteText ||
       `${monthNumber}-oy to'lovi: ${Math.round(actualAmount)} $`;
@@ -64,7 +55,6 @@ export class PaymentCreatorHelper {
       createBy: String(managerId),
     });
 
-    // Payment yaratish
     const payment = await Payment.create({
       amount: Math.round(monthlyPayment),
       actualAmount: Math.round(actualAmount),
@@ -94,18 +84,7 @@ export class PaymentCreatorHelper {
     return payment;
   }
 
-  /**
-   * ✅ YANGI: Shartnoma uchun barcha oylik to'lovlarni oldindan yaratish
-   * Bu to'lovlar database'da mavjud bo'ladi, lekin isPaid: false
-   * Reminder belgilash mumkin bo'ladi
-   * 
-   * @param contractId - Shartnoma ID
-   * @param period - Shartnoma muddati (oylar)
-   * @param monthlyPayment - Oylik to'lov miqdori
-   * @param startDate - Shartnoma boshlanish sanasi
-   * @param customerId - Mijoz ID
-   * @param managerId - Manager ID
-   */
+  
   static async createAllMonthlyPaymentsForContract(data: {
     contractId: any;
     period: number;
@@ -133,36 +112,31 @@ export class PaymentCreatorHelper {
     const start = new Date(startDate);
 
     for (let month = 1; month <= period; month++) {
-      // Har bir oy uchun to'lov sanasini hisoblash
       const paymentDate = new Date(start);
       paymentDate.setMonth(paymentDate.getMonth() + month);
 
-      // Notes yaratish (default)
       const notes = await Notes.create({
         text: `${month}-oy to'lovi (rejalashtirilgan)`,
         customer: customerId,
         createBy: String(managerId),
       });
 
-      // Payment yaratish - isPaid: false, status: SCHEDULED
-      // ✅ MUHIM: status SCHEDULED - kassada ko'rinmaydi
-      // Bu faqat kelgusida to'lanishi kerak bo'lgan rejalashtirilgan to'lov
       const payment = await Payment.create({
         amount: Math.round(monthlyPayment),
-        actualAmount: 0, // Hali to'lanmagan
-        date: paymentDate, // ✅ MUHIM: Haqiqiy to'lov sanasi (o'zgarmasligi kerak!)
+        actualAmount: 0,
+        date: paymentDate,
         isPaid: false,
         paymentType: PaymentType.MONTHLY,
         customerId: customerId,
         managerId: managerId,
         notes: notes._id,
-        status: PaymentStatus.SCHEDULED, // ✅ TUZATISH: SCHEDULED - kassada ko'rinmaydi
+        status: PaymentStatus.SCHEDULED,
         expectedAmount: Math.round(monthlyPayment),
-        remainingAmount: Math.round(monthlyPayment), // To'liq summa qolgan
+        remainingAmount: Math.round(monthlyPayment),
         excessAmount: 0,
-        targetMonth: month, // ✅ MUHIM: Qaysi oy
-        reminderDate: null, // ✅ Manager belgilashi mumkin
-        contractId: String(contractId), // ✅ YANGI: Shartnoma ID (customId)
+        targetMonth: month,
+        reminderDate: null,
+        contractId: String(contractId),
       });
 
       payments.push(payment);
@@ -175,10 +149,7 @@ export class PaymentCreatorHelper {
     return payments;
   }
 
-  /**
-   * Bir nechta oylik to'lovlar yaratish
-   * @param data - To'lovlar ma'lumotlari
-   */
+  
   static async createMultipleMonthlyPayments(data: {
     totalAmount: number;
     monthlyPayment: number;
@@ -235,7 +206,6 @@ export class PaymentCreatorHelper {
 
       createdPayments.push(payment);
 
-      // Contract.payments ga qo'shish
       if (!contract.payments) {
         contract.payments = [];
       }

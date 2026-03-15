@@ -18,7 +18,6 @@ router.get(
 
 router.get(
   "/manager",
-  // checkPermission(Permission.VIEW_EMPLOYEE),
   employeeController.getManager
 );
 router.post(

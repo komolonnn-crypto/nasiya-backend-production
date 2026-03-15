@@ -3,10 +3,10 @@ import { IEmployee } from "./employee.schema";
 
 export enum AuditAction {
   CREATE = "CREATE",
-  UPDATE = "UPDATE", 
+  UPDATE = "UPDATE",
   DELETE = "DELETE",
   PAYMENT = "PAYMENT",
-  BULK_IMPORT = "BULK_IMPORT", // Excel import uchun
+  BULK_IMPORT = "BULK_IMPORT",
   LOGIN = "LOGIN",
   LOGOUT = "LOGOUT",
   STATUS_CHANGE = "STATUS_CHANGE",
@@ -14,7 +14,7 @@ export enum AuditAction {
   CONFIRM = "CONFIRM",
   REJECT = "REJECT",
   PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED",
-  PAYMENT_REJECTED = "PAYMENT_REJECTED"
+  PAYMENT_REJECTED = "PAYMENT_REJECTED",
 }
 
 export enum AuditEntity {
@@ -26,88 +26,67 @@ export enum AuditEntity {
   AUTH = "auth",
   EXCEL_IMPORT = "excel_import",
   EXPENSES = "expenses",
-  DEBTOR = "debtor"
+  DEBTOR = "debtor",
 }
 
 export interface IAuditMetadata {
-  // Excel import uchun
   fileName?: string;
   totalRows?: number;
   successfulRows?: number;
   failedRows?: number;
-  
-  // Payment uchun
   paymentType?: string;
   paymentStatus?: string;
+  paymentMethod?: string;
   amount?: number;
-  actualAmount?: number; // To'langan summa
-  remainingAmount?: number; // Qolgan summa
+  originalAmount?: number;
+  actualAmount?: number;
+  remainingAmount?: number;
+  excessAmount?: number;
+  prepaidRecordId?: string;
   targetMonth?: number;
-  contractId?: string; // ✅ YANGI: Shartnoma ID (customId)
-  paymentCreatorId?: string; // ✅ YANGI: Pulni yig'ib to'lovni qilgan odam (managerId)
-  paymentCreatorName?: string; // ✅ YANGI: Pulni yig'ib to'lovni qilgan odam ismi
-  
-  // Contract uchun
+  contractId?: string;
+  paymentCreatorId?: string;
+  paymentCreatorName?: string;
   contractStatus?: string;
   monthlyPayment?: number;
   totalPrice?: number;
-  
-  // Expenses uchun
   dollar?: number;
   sum?: number;
   expensesNotes?: string;
   managerName?: string;
-  
-  // Employee info (kim bajargan)
   employeeName?: string;
   employeeRole?: string;
-  
-  // General
   affectedEntities?: {
     entityType: string;
     entityId: string;
     entityName?: string;
   }[];
-  
-  // Mijoz ismi (to'lovlar uchun)
   customerName?: string;
-
-  // ✅ YANGI: Request performance va browser info
-  requestDuration?: number; // Request davomiyligi (ms)
+  requestDuration?: number;
   browserInfo?: {
     userAgent: string;
     isMobile: boolean;
     browser: string;
   };
-  errorMessage?: string; // Xatolik xabari
-  stackTrace?: string; // Stack trace
+  errorMessage?: string;
+  stackTrace?: string;
 }
 
 export interface IAuditLog {
   action: AuditAction;
   entity: AuditEntity;
-  entityId?: string; // Asosiy entity ID
-  userId: string | IEmployee; // Kim bajargan
+  entityId?: string;
+  userId: string | IEmployee;
   userType: "employee" | "customer";
-  
-  // O'zgarishlar (UPDATE uchun)
   changes?: {
     field: string;
     oldValue: any;
     newValue: any;
   }[];
-  
-  // Qo'shimcha ma'lumotlar
   metadata?: IAuditMetadata;
-  
-  // Request info
   ipAddress?: string;
   userAgent?: string;
-  
-  // Sana
   timestamp: Date;
-  
-  // Mongoose timestamps
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -120,13 +99,13 @@ const AuditLogSchema = new Schema<IAuditLog>(
       required: true,
     },
     entity: {
-      type: String, 
+      type: String,
       enum: Object.values(AuditEntity),
       required: true,
     },
     entityId: {
       type: String,
-      required: false, // BULK_IMPORT uchun entityId bo'lmasligi mumkin
+      required: false,
     },
     userId: {
       type: Schema.Types.ObjectId,
@@ -147,42 +126,33 @@ const AuditLogSchema = new Schema<IAuditLog>(
       },
     ],
     metadata: {
-      // Excel import
       fileName: String,
       totalRows: Number,
       successfulRows: Number,
       failedRows: Number,
-      
-      // Payment
       paymentType: String,
       paymentStatus: String,
+      paymentMethod: String,
       amount: Number,
-      actualAmount: Number, // To'langan summa
-      remainingAmount: Number, // Qolgan summa
+      originalAmount: Number,
+      actualAmount: Number,
+      remainingAmount: Number,
+      excessAmount: Number,
+      prepaidRecordId: String,
       targetMonth: Number,
-      contractId: String, // ✅ YANGI: Shartnoma ID (customId)
-      paymentCreatorId: String, // ✅ YANGI: Pulni yig'ib to'lovni qilgan odam (managerId)
-      paymentCreatorName: String, // ✅ YANGI: Pulni yig'ib to'lovni qilgan odam ismi
-      
-      // Contract  
+      contractId: String,
+      paymentCreatorId: String,
+      paymentCreatorName: String,
       contractStatus: String,
       monthlyPayment: Number,
       totalPrice: Number,
-      
-      // Expenses
       dollar: Number,
       sum: Number,
       expensesNotes: String,
       managerName: String,
-      
-      // Employee info
       employeeName: String,
       employeeRole: String,
-      
-      // Mijoz ismi
       customerName: String,
-      
-      // Affected entities
       affectedEntities: [
         {
           entityType: String,
@@ -191,16 +161,14 @@ const AuditLogSchema = new Schema<IAuditLog>(
           _id: false,
         },
       ],
-
-      // ✅ YANGI: Performance va browser info
-      requestDuration: Number, // Request davomiyligi (ms)
+      requestDuration: Number,
       browserInfo: {
         userAgent: String,
         isMobile: Boolean,
         browser: String,
       },
-      errorMessage: String, // Xatolik xabari
-      stackTrace: String, // Stack trace
+      errorMessage: String,
+      stackTrace: String,
     },
     ipAddress: String,
     userAgent: String,
@@ -212,41 +180,48 @@ const AuditLogSchema = new Schema<IAuditLog>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Indexes for performance
-AuditLogSchema.index({ timestamp: -1 }); // So'nggi yozuvlar uchun
-AuditLogSchema.index({ userId: 1, timestamp: -1 }); // User activity uchun
-AuditLogSchema.index({ entity: 1, entityId: 1, timestamp: -1 }); // Entity history uchun
-AuditLogSchema.index({ action: 1, timestamp: -1 }); // Action filter uchun
-AuditLogSchema.index({ 
-  timestamp: -1, 
-  entity: 1, 
-  action: 1 
-}, { 
-  name: "idx_daily_activity" 
-}); // Kunlik activity uchun
+AuditLogSchema.index({ timestamp: -1 });
+AuditLogSchema.index({ userId: 1, timestamp: -1 });
+AuditLogSchema.index({ entity: 1, entityId: 1, timestamp: -1 });
+AuditLogSchema.index({ action: 1, timestamp: -1 });
+AuditLogSchema.index(
+  {
+    timestamp: -1,
+    entity: 1,
+    action: 1,
+  },
+  {
+    name: "idx_daily_activity",
+  },
+);
 
-// ✅ YANGI: Qo'shimcha performance indexes
-AuditLogSchema.index({ 
-  userId: 1, 
-  action: 1, 
-  timestamp: -1 
-}, { 
-  name: "idx_user_action_activity" 
-}); // User bo'yicha filter uchun
+AuditLogSchema.index(
+  {
+    userId: 1,
+    action: 1,
+    timestamp: -1,
+  },
+  {
+    name: "idx_user_action_activity",
+  },
+);
 
-AuditLogSchema.index({ 
-  'metadata.customerName': 'text',
-  'metadata.affectedEntities.entityName': 'text'
-}, {
-  name: "idx_search_text",
-  weights: {
-    'metadata.customerName': 10,
-    'metadata.affectedEntities.entityName': 5
-  }
-}); // Search uchun text index
+AuditLogSchema.index(
+  {
+    "metadata.customerName": "text",
+    "metadata.affectedEntities.entityName": "text",
+  },
+  {
+    name: "idx_search_text",
+    weights: {
+      "metadata.customerName": 10,
+      "metadata.affectedEntities.entityName": 5,
+    },
+  },
+);
 
 const AuditLog = model<IAuditLog>("AuditLog", AuditLogSchema);
 

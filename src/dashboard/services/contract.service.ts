@@ -1,7 +1,4 @@
-/**
- * Contract Service - REFACTORED VERSION
- * Delegates complex operations to specialized modules
- */
+
 
 import BaseError from "../../utils/base.error";
 import Contract, { ContractStatus } from "../../schemas/contract.schema";
@@ -16,17 +13,12 @@ import Employee from "../../schemas/employee.schema";
 import Notes from "../../schemas/notes.schema";
 import Customer from "../../schemas/customer.schema";
 
-// Import specialized modules
 import contractQueryService from "./contract/contract.query.service";
 import contractEditHandler from "./contract/contract.edit.handler";
 import contractBalanceHelper from "./contract/contract.balance.helper";
 import contractPaymentHelper from "./contract/contract.payment.helper";
 
 class ContractService {
-  // ========================================
-  // QUERY METHODS (Delegated to Query Service)
-  // ========================================
-
   async getAll() {
     return contractQueryService.getAll();
   }
@@ -43,18 +35,11 @@ class ContractService {
     return contractQueryService.getContractById(contractId);
   }
 
-  // ========================================
-  // EDIT METHODS (Delegated to Edit Handler)
-  // ========================================
-
   async update(data: UpdateContractDto, user: IJwtUser) {
     return contractEditHandler.update(data, user);
   }
 
-  /**
-   * Ta'sir tahlili - shartnoma tahrirlashdan oldin preview
-   * Requirements: 1.2, 1.3, 1.4, 1.5
-   */
+  
   async analyzeContractEditImpact(
     contractId: string,
     changes: {
@@ -69,7 +54,6 @@ class ContractService {
         throw BaseError.NotFoundError("Shartnoma topilmadi");
       }
 
-      // Calculate changes array
       const changesArray: Array<{
         field: string;
         oldValue: any;
@@ -104,8 +88,6 @@ class ContractService {
         });
       }
 
-      // Use private method from contract.service.ts to analyze impact
-      // For now, we'll do basic analysis here
       const Payment = (await import("../../schemas/payment.schema")).default;
       const { PaymentType } = await import("../../schemas/payment.schema");
 
@@ -117,7 +99,6 @@ class ContractService {
         additionalPaymentsCreated: 0,
       };
 
-      // Only analyze if monthlyPayment changed
       const monthlyPaymentChange = changesArray.find(
         (c) => c.field === "monthlyPayment"
       );
@@ -133,13 +114,11 @@ class ContractService {
           const diff = payment.amount - monthlyPaymentChange.newValue;
 
           if (diff < -0.01) {
-            // UNDERPAID
             const shortage = Math.abs(diff);
             impact.underpaidCount++;
             impact.totalShortage += shortage;
             impact.additionalPaymentsCreated++;
           } else if (diff > 0.01) {
-            // OVERPAID
             const excess = diff;
             impact.overpaidCount++;
             impact.totalExcess += excess;
@@ -158,14 +137,7 @@ class ContractService {
     }
   }
 
-  // ========================================
-  // CREATE METHODS
-  // ========================================
-
-  /**
-   * Create contract (Dashboard)
-   * Requirements: 1.2, 2.3, 3.2
-   */
+  
   async create(data: CreateContractDto, user: IJwtUser) {
     try {
       logger.debug("🚀 === CONTRACT CREATION STARTED ===");
@@ -178,7 +150,7 @@ class ContractService {
 
       const {
         customer,
-        customId, // ✅ YANGI: Custom contract ID
+        customId,
         productName,
         originalPrice,
         price,
@@ -194,24 +166,21 @@ class ContractService {
         receipt,
         iCloud,
         startDate,
-        currency, // ✅ YANGI: Pul birligi
+        currency,
       } = data;
 
-      // 1. Validate employee
       const createBy = await Employee.findById(user.sub);
       if (!createBy) {
         throw BaseError.ForbiddenError("Mavjud bo'lmagan xodim");
       }
       logger.debug("👤 Employee found:", createBy._id);
 
-      // 2. Validate customer
       const customerDoc = await Customer.findById(customer);
       if (!customerDoc) {
         throw BaseError.NotFoundError("Mijoz topilmadi");
       }
       logger.debug("🤝 Customer found:", customerDoc._id);
 
-      // 3. Create notes
       const newNotes = new Notes({
         text: notes || "Shartnoma yaratildi",
         customer,
@@ -220,21 +189,16 @@ class ContractService {
       await newNotes.save();
       logger.info("📝 Notes created:", newNotes._id);
 
-      // 4. Create contract
       const contractStartDate = startDate ? new Date(startDate) : new Date();
 
-      // Next payment date - 1 month after startDate
       const nextPaymentDate = new Date(contractStartDate);
       nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
 
-      // ✅ TUZATISH: originalPaymentDay va initialPaymentDueDate ni to'g'ri o'rnatish
-      // Agar initialPaymentDueDate berilgan bo'lsa, undan kunni olamiz (bu to'lov kuni)
       const paymentDueDate = initialPaymentDueDate ? new Date(initialPaymentDueDate) : nextPaymentDate;
       const originalPaymentDay = paymentDueDate.getDate();
 
       logger.debug(`📅 Setting originalPaymentDay from ${initialPaymentDueDate ? 'initialPaymentDueDate' : 'nextPaymentDate'}: ${originalPaymentDay}`);
 
-      // ✅ YANGI: customId generate qilish (agar berilmagan bo'lsa)
       let finalCustomId = customId;
       if (!finalCustomId) {
         const year = new Date().getFullYear().toString().slice(-2);
@@ -246,7 +210,7 @@ class ContractService {
 
       const contract = new Contract({
         customer,
-        customId: finalCustomId, // ✅ YANGI: Custom ID (generate qilingan yoki berilgan)
+        customId: finalCustomId,
         productName,
         originalPrice,
         price,
@@ -259,7 +223,7 @@ class ContractService {
         totalPrice,
         startDate: contractStartDate,
         nextPaymentDate: nextPaymentDate,
-        originalPaymentDay: originalPaymentDay, // ✅ FIXED: Har oy to'lanadigan kun raqami
+        originalPaymentDay: originalPaymentDay,
         isActive: true,
         createBy: createBy._id,
         info: {
@@ -271,13 +235,12 @@ class ContractService {
         payments: [],
         isDeclare: false,
         status: ContractStatus.ACTIVE,
-        currency: currency || "USD", // ✅ YANGI: Pul birligi
+        currency: currency || "USD",
       });
 
       await contract.save();
       logger.debug("📋 Contract created:", contract._id);
 
-      // 🔍 AUDIT LOG: Contract yaratish
       const customerData = customerDoc as any;
       await auditLogService.logContractCreate(
         contract._id.toString(),
@@ -288,8 +251,6 @@ class ContractService {
         user.sub
       );
 
-      // ✅ YANGI: Barcha oylik to'lovlarni oldindan yaratish
-      // Bu reminder qo'yish uchun zarur
       const { PaymentCreatorHelper } = await import("../../utils/helpers/payment-creator.helper");
       const allMonthlyPayments = await PaymentCreatorHelper.createAllMonthlyPaymentsForContract({
         contractId: contract._id,
@@ -300,12 +261,10 @@ class ContractService {
         managerId: createBy._id,
       });
 
-      // Contract'ga to'lovlarni qo'shish
       contract.payments = allMonthlyPayments.map((p) => p._id) as any;
       await contract.save();
       logger.debug(`📅 Added ${allMonthlyPayments.length} monthly payments to contract`);
 
-      // 5. Create initial payment (if exists) - DELEGATED
       if (initialPayment && initialPayment > 0) {
         await contractPaymentHelper.createInitialPayment(
           contract,
@@ -313,7 +272,6 @@ class ContractService {
           user
         );
 
-        // 6. Update balance - DELEGATED
         await contractBalanceHelper.updateBalance(createBy._id, {
           dollar: initialPayment,
           sum: 0,
@@ -333,9 +291,7 @@ class ContractService {
     }
   }
 
-  /**
-   * Create contract (Seller)
-   */
+  
   async sellerCreate(data: CreateContractDto, user: IJwtUser) {
     try {
       logger.debug("🚀 === SELLER CONTRACT CREATION STARTED ===");
@@ -358,22 +314,19 @@ class ContractService {
         receipt,
         iCloud,
         startDate,
-        currency, // ✅ YANGI: Pul birligi
+        currency,
       } = data;
 
-      // 1. Validate employee
       const createBy = await Employee.findById(user.sub);
       if (!createBy) {
         throw BaseError.ForbiddenError("Mavjud bo'lmagan xodim");
       }
 
-      // 2. Validate customer
       const customerDoc = await Customer.findById(customer);
       if (!customerDoc) {
         throw BaseError.NotFoundError("Mijoz topilmadi");
       }
 
-      // 3. Create notes
       const newNotes = new Notes({
         text: notes || "Shartnoma yaratildi (Sotuvchi)",
         customer,
@@ -381,18 +334,15 @@ class ContractService {
       });
       await newNotes.save();
 
-      // 4. Create contract (NOT ACTIVE - needs approval)
       const contractStartDate = startDate ? new Date(startDate) : new Date();
       const nextPaymentDate = new Date(contractStartDate);
       nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
 
-      // ✅ TUZATISH: originalPaymentDay va initialPaymentDueDate ni to'g'ri o'rnatish
       const paymentDueDate = initialPaymentDueDate
         ? new Date(initialPaymentDueDate)
         : nextPaymentDate;
       const originalPaymentDay = paymentDueDate.getDate();
 
-      // ✅ YANGI: customId generate qilish (agar berilmagan bo'lsa)
       let finalCustomId = customId;
       if (!finalCustomId) {
         const year = new Date().getFullYear().toString().slice(-2);
@@ -404,7 +354,7 @@ class ContractService {
 
       const contract = new Contract({
         customer,
-        customId: finalCustomId, // ✅ YANGI: Custom ID (generate qilingan yoki berilgan)
+        customId: finalCustomId,
         productName,
         originalPrice,
         price,
@@ -417,8 +367,8 @@ class ContractService {
         totalPrice,
         startDate: contractStartDate,
         nextPaymentDate: nextPaymentDate,
-        originalPaymentDay: originalPaymentDay, // ✅ FIXED: Har oy to'lanadigan kun raqami
-        isActive: false, // ⚠️ Needs approval
+        originalPaymentDay: originalPaymentDay,
+        isActive: false,
         createBy: createBy._id,
         info: {
           box: box || false,
@@ -429,7 +379,7 @@ class ContractService {
         payments: [],
         isDeclare: false,
         status: ContractStatus.ACTIVE,
-        currency: currency || "USD", // ✅ YANGI: Pul birligi
+        currency: currency || "USD",
       });
 
       await contract.save();
@@ -445,9 +395,7 @@ class ContractService {
     }
   }
 
-  /**
-   * Approve contract (Manager only)
-   */
+  
   async approveContract(contractId: string, user: IJwtUser) {
     try {
       logger.debug("✅ === CONTRACT APPROVAL STARTED ===");
@@ -461,11 +409,9 @@ class ContractService {
         throw BaseError.BadRequest("Shartnoma allaqachon tasdiqlangan");
       }
 
-      // Activate contract
       contract.isActive = true;
       await contract.save();
 
-      // Create initial payment if exists - DELEGATED
       if (contract.initialPayment && contract.initialPayment > 0) {
         await contractPaymentHelper.createInitialPayment(
           contract,
@@ -473,7 +419,6 @@ class ContractService {
           user
         );
 
-        // Update balance - DELEGATED
         const employee = await Employee.findById(user.sub);
         if (employee) {
           await contractBalanceHelper.updateBalance(employee._id, {
@@ -494,24 +439,18 @@ class ContractService {
     }
   }
 
-  /**
-   * Delete contract (soft delete with cascade)
-   * Requirements: DELETE_CONTRACT permission
-   */
+  
   async deleteContract(contractId: string, user: IJwtUser) {
     try {
       logger.debug("🗑️ === CONTRACT SOFT DELETE STARTED ===");
       logger.debug(`Contract ID: ${contractId}`);
 
-      // 1. Find contract
       const contract = await Contract.findById(contractId).populate("customer");
       if (!contract) {
         throw BaseError.NotFoundError("Shartnoma topilmadi");
       }
 
-      // 2. Check if contract is active (only Admin can delete active contracts)
       if (contract.status === ContractStatus.ACTIVE) {
-        // Check if user is Admin
         const employee = await Employee.findById(user.sub).populate("role");
         const roleName = (employee?.role as any)?.name;
         const isAdmin = roleName === "admin";
@@ -527,7 +466,6 @@ class ContractService {
         logger.debug("⚠️ Admin active shartnomani o'chirmoqda");
       }
 
-      // 3. Calculate total paid amount to revert from balance
       const Payment = (await import("../../schemas/payment.schema")).default;
       const paidPayments = await Payment.find({
         _id: { $in: contract.payments },
@@ -541,13 +479,10 @@ class ContractService {
 
       logger.debug(`💰 Total paid amount to revert: $${totalPaidAmount}`);
 
-      // 4. Import cascade delete handler
       const { cascadeDeleteContract } = await import("../../middlewares/cascade.middleware");
 
-      // 5. Execute cascade delete (will handle payments and debtors)
       await cascadeDeleteContract(contractId);
 
-      // 6. Revert balance - ayirish
       if (totalPaidAmount > 0) {
         const managerId = (contract.createBy as any)?._id || contract.createBy || user.sub;
         await contractBalanceHelper.revertBalance(managerId, {
@@ -557,12 +492,10 @@ class ContractService {
         logger.debug(`✅ Balance reverted: -$${totalPaidAmount} from manager ${managerId}`);
       }
 
-      // 7. Soft delete contract
       contract.isDeleted = true;
       contract.deletedAt = new Date();
       await contract.save();
 
-      // 8. Audit log with employee info
       const customerData = contract.customer as any;
       const employee = await Employee.findById(user.sub).populate("role");
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : "Unknown";
@@ -591,23 +524,17 @@ class ContractService {
     }
   }
 
-  /**
-   * Hard delete contract (PERMANENT - Admin & Moderator only)
-   * ⚠️ WARNING: This action is IRREVERSIBLE!
-   * Requirements: DELETE_CONTRACT permission + (Admin OR Moderator role)
-   */
+  
   async hardDeleteContract(contractId: string, user: IJwtUser) {
     try {
       logger.debug("🔥 === CONTRACT HARD DELETE STARTED ===");
       logger.debug(`Contract ID: ${contractId}`);
 
-      // 1. Find contract (including soft deleted ones)
       const contract = await Contract.findById(contractId).populate("customer");
       if (!contract) {
         throw BaseError.NotFoundError("Shartnoma topilmadi");
       }
 
-      // 2. Check user role - only Admin and Moderator can hard delete
       const employee = await Employee.findById(user.sub).populate("role");
       const roleName = (employee?.role as any)?.name;
       const canHardDelete = roleName === "admin" || roleName === "moderator";
@@ -620,12 +547,11 @@ class ContractService {
         );
       }
 
-      // 3. Calculate total paid amount (if not already reverted from soft delete)
       const Payment = (await import("../../schemas/payment.schema")).default;
       const paidPayments = await Payment.find({
         _id: { $in: contract.payments },
         isPaid: true,
-        isDeleted: false, // Only count payments not already soft deleted
+        isDeleted: false,
       });
 
       let totalPaidAmount = 0;
@@ -635,7 +561,6 @@ class ContractService {
 
       logger.debug(`💰 Total paid amount to revert: $${totalPaidAmount}`);
 
-      // 4. Revert balance if not already reverted
       if (totalPaidAmount > 0 && !contract.isDeleted) {
         const managerId = (contract.createBy as any)?._id || contract.createBy || user.sub;
         await contractBalanceHelper.revertBalance(managerId, {
@@ -645,25 +570,20 @@ class ContractService {
         logger.debug(`✅ Balance reverted: -$${totalPaidAmount} from manager ${managerId}`);
       }
 
-      // 5. HARD DELETE: Remove all related data from database
       const Notes = (await import("../../schemas/notes.schema")).default;
       const { Debtor } = await import("../../schemas/debtor.schema");
 
-      // Delete all payments permanently
       await Payment.deleteMany({ _id: { $in: contract.payments } });
       logger.debug(`✅ Deleted ${contract.payments.length} payments permanently`);
 
-      // Delete all debtors permanently
       const deletedDebtors = await Debtor.deleteMany({ contractId: contractId });
       logger.debug(`✅ Deleted ${deletedDebtors.deletedCount} debtors permanently`);
 
-      // Delete notes permanently
       if (contract.notes) {
         await Notes.findByIdAndDelete(contract.notes);
         logger.debug(`✅ Deleted notes permanently`);
       }
 
-      // 6. Audit log BEFORE deleting contract
       const customerData = contract.customer as any;
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : "Unknown";
 
@@ -677,7 +597,6 @@ class ContractService {
         `${roleName} (HARD DELETE)`
       );
 
-      // 7. Delete contract permanently from database
       await Contract.findByIdAndDelete(contractId);
       logger.debug("🔥 Contract PERMANENTLY deleted from database");
 

@@ -1,9 +1,4 @@
-/**
- * Migration 006: Create missing monthly payments for all contracts
- * 
- * MUAMMO: Ba'zi shartnomalar uchun barcha oylik to'lovlar yaratilmagan
- * YECHIM: Har bir shartnoma uchun `period` ga ko'ra barcha to'lovlarni yaratish
- */
+
 
 import mongoose from "mongoose";
 import Contract, { ContractStatus } from "../schemas/contract.schema";
@@ -15,7 +10,6 @@ export async function up() {
   try {
     logger.info("🚀 === MIGRATION 006: Creating missing payments ===");
 
-    // Barcha aktiv shartnomalarni topish
     const contracts = await Contract.find({
       isActive: true,
       isDeleted: false,
@@ -28,22 +22,19 @@ export async function up() {
     let contractsFixed = 0;
 
     for (const contract of contracts) {
-      // Mavjud oylik to'lovlar sonini hisoblash
       const existingPayments = await Payment.find({
         _id: { $in: contract.payments || [] },
         paymentType: PaymentType.MONTHLY,
       }).sort({ date: 1 });
 
-      const expectedMonthlyPayments = contract.period; // 12 oy
+      const expectedMonthlyPayments = contract.period;
       const actualMonthlyPayments = existingPayments.length;
 
       if (actualMonthlyPayments >= expectedMonthlyPayments) {
-        // To'lovlar to'liq
         continue;
       }
 
  
-      // Qolgan to'lovlarni yaratish
       const missingPaymentsCount = expectedMonthlyPayments - actualMonthlyPayments;
       const startDate = new Date(contract.startDate);
       const originalDay = contract.originalPaymentDay || startDate.getDate();
@@ -51,21 +42,18 @@ export async function up() {
       for (let i = actualMonthlyPayments; i < expectedMonthlyPayments; i++) {
         const monthNumber = i + 1;
         
-        // To'lov sanasini hisoblash
         const paymentDate = new Date(
           startDate.getFullYear(),
           startDate.getMonth() + i,
           originalDay
         );
 
-        // Notes yaratish
         const notes = await Notes.create({
           text: `${monthNumber}-oy to'lovi (migration tomonidan yaratildi)`,
           customer: contract.customer,
           createBy: contract.createBy,
         });
 
-        // Payment yaratish
         const payment = await Payment.create({
           amount: contract.monthlyPayment,
           actualAmount: 0,
@@ -82,7 +70,6 @@ export async function up() {
           targetMonth: monthNumber,
         });
 
-        // Contract.payments ga qo'shish
         if (!contract.payments) {
           contract.payments = [];
         }
@@ -94,7 +81,6 @@ export async function up() {
         );
       }
 
-      // Contract'ni saqlash
       await contract.save();
       contractsFixed++;
 

@@ -9,16 +9,8 @@ import Employee from "../schemas/employee.schema";
 import Notification from "../schemas/notification.schema";
 import logger from "../utils/logger";
 
-/**
- * Notification Service
- * Telegram orqali xabarlar yuborish
- * Requirements: B1, B2, B3, B4, B5, B6
- */
 class NotificationService {
-  /**
-   * To'lov tasdiqlanganda xabar yuborish
-   * Requirements: B2
-   */
+  
   async sendPaymentConfirmed(
     payment: IPayment,
     customer: ICustomer,
@@ -39,12 +31,10 @@ class NotificationService {
       let statusIcon = "✅";
 
       if (difference < -0.01) {
-        // UNDERPAID
         const shortage = Math.abs(difference);
         statusText = `⚠️ Kam to'landi\n💰 To'langan: $${actualAmount.toFixed(2)}\n📉 Kam: $${shortage.toFixed(2)}`;
         statusIcon = "⚠️";
       } else if (difference > 0.01) {
-        // OVERPAID
         const excess = difference;
         statusText = `💰 Ko'p to'landi\n💵 To'langan: $${actualAmount.toFixed(2)}\n📈 Ortiqcha: $${excess.toFixed(2)}`;
         statusIcon = "💰";
@@ -71,10 +61,7 @@ ${statusIcon} <b>TO'LOV TASDIQLANDI</b>
     }
   }
 
-  /**
-   * To'lov rad etilganda xabar yuborish
-   * Requirements: B3
-   */
+  
   async sendPaymentRejected(
     payment: IPayment,
     customer: ICustomer,
@@ -109,10 +96,7 @@ ${statusIcon} <b>TO'LOV TASDIQLANDI</b>
     }
   }
 
-  /**
-   * Avtomatik rad etilganda xabar yuborish
-   * Requirements: B4
-   */
+  
   async sendPaymentAutoRejected(
     payment: IPayment,
     customer: ICustomer,
@@ -150,10 +134,7 @@ ${statusIcon} <b>TO'LOV TASDIQLANDI</b>
     }
   }
 
-  /**
-   * Ko'p to'langan xabarnoma (ortiqcha to'lov taqsimoti bilan)
-   * Requirements: B6
-   */
+  
   async sendOverpaymentNotification(
     payment: IPayment,
     customer: ICustomer,
@@ -211,10 +192,7 @@ ${distributionText}${prepaidText}
     }
   }
 
-  /**
-   * Kam to'langan xabarnoma
-   * Requirements: B5
-   */
+  
   async sendUnderpaymentNotification(
     payment: IPayment,
     customer: ICustomer,

@@ -1,8 +1,4 @@
-/**
- * Health Check Endpoint
- *
- * Provides comprehensive health status for monitoring systems
- */
+
 
 import { Request, Response } from "express";
 import mongoose from "mongoose";
@@ -30,9 +26,6 @@ interface HealthCheck {
   details?: any;
 }
 
-/**
- * Check database connectivity and performance
- */
 async function checkDatabase(): Promise<HealthCheck> {
   const startTime = Date.now();
 
@@ -45,7 +38,6 @@ async function checkDatabase(): Promise<HealthCheck> {
       };
     }
 
-    // Ping database
     if (!mongoose.connection.db) {
       return {
         status: "fail",
@@ -78,9 +70,6 @@ async function checkDatabase(): Promise<HealthCheck> {
   }
 }
 
-/**
- * Check memory usage
- */
 function checkMemory(): HealthCheck {
   const usage = process.memoryUsage();
   const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
@@ -111,9 +100,6 @@ function checkMemory(): HealthCheck {
   };
 }
 
-/**
- * Check contract service
- */
 async function checkContracts(): Promise<HealthCheck> {
   const startTime = Date.now();
 
@@ -138,9 +124,6 @@ async function checkContracts(): Promise<HealthCheck> {
   }
 }
 
-/**
- * Check payment service
- */
 async function checkPayments(): Promise<HealthCheck> {
   const startTime = Date.now();
 
@@ -165,12 +148,8 @@ async function checkPayments(): Promise<HealthCheck> {
   }
 }
 
-/**
- * Health check endpoint handler
- */
 export async function healthCheck(req: Request, res: Response): Promise<void> {
   try {
-    // Run all health checks in parallel
     const [database, memory, contracts, payments] = await Promise.all([
       checkDatabase(),
       Promise.resolve(checkMemory()),
@@ -180,7 +159,6 @@ export async function healthCheck(req: Request, res: Response): Promise<void> {
 
     const checks = { database, memory, contracts, payments };
 
-    // Determine overall status
     const hasFailure = Object.values(checks).some((c) => c.status === "fail");
     const hasWarning = Object.values(checks).some((c) => c.status === "warn");
 
@@ -202,7 +180,6 @@ export async function healthCheck(req: Request, res: Response): Promise<void> {
       checks,
     };
 
-    // Set appropriate HTTP status code
     const statusCode = overallStatus === "unhealthy" ? 503 : 200;
 
     res.status(statusCode).json(healthStatus);
@@ -215,22 +192,15 @@ export async function healthCheck(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Simple liveness probe (for Kubernetes/Docker)
- */
 export function livenessProbe(req: Request, res: Response): void {
   res.status(200).json({ status: "alive" });
 }
 
-/**
- * Readiness probe (for Kubernetes/Docker)
- */
 export async function readinessProbe(
   req: Request,
   res: Response
 ): Promise<void> {
   try {
-    // Check if database is ready
     if (mongoose.connection.readyState !== 1) {
       res.status(503).json({ status: "not ready", reason: "database" });
       return;

@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 import Customer from "../schemas/customer.schema";
 import logger from "../utils/logger";
 
-/**
- * Migration: Combine firstName and lastName into fullName
- * This migration combines existing firstName and lastName fields into a single fullName field
- */
-
 export async function up() {
   logger.info("🔄 Starting migration: 007-customer-fullname (UP)");
 
@@ -19,7 +14,6 @@ export async function up() {
 
     for (const customer of customers) {
       try {
-        // Check if customer has old firstName/lastName fields
         const customerDoc = customer.toObject() as any;
         
         if (customerDoc.firstName !== undefined || customerDoc.lastName !== undefined) {
@@ -27,7 +21,6 @@ export async function up() {
           const lastName = customerDoc.lastName || "";
           const fullName = `${firstName} ${lastName}`.trim();
 
-          // Update to new fullName field
           await Customer.updateOne(
             { _id: customer._id },
             {
@@ -71,7 +64,6 @@ export async function down() {
         const customerDoc = customer.toObject() as any;
         
         if (customerDoc.fullName) {
-          // Split fullName back into firstName and lastName
           const nameParts = customerDoc.fullName.trim().split(/\s+/);
           const firstName = nameParts[0] || "";
           const lastName = nameParts.slice(1).join(" ") || "";
