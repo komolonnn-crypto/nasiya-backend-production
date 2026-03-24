@@ -273,11 +273,11 @@ class CustomerService {
     })
       .populate({
         path: "manager",
-        select: "fullName _id isDeleted",
+        select: "firstName lastName _id isDeleted",
       })
       .populate({
         path: "editHistory.editedBy",
-        select: "fullName _id",
+        select: "firstName lastName _id",
       });
 
     if (!customer) {
@@ -785,7 +785,11 @@ class CustomerService {
     }
 
     if (userId) {
-      await auditLogService.logCustomerRestoration(id, customer.fullName, userId);
+      await auditLogService.logCustomerRestoration(
+        id,
+        customer.fullName,
+        userId,
+      );
     }
 
     return { message: "Mijoz qayta tiklandi" };

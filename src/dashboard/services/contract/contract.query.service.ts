@@ -1,10 +1,7 @@
-
-
 import Contract, { ContractStatus } from "../../../schemas/contract.schema";
 import { Types } from "mongoose";
 
 export class ContractQueryService {
-  
   async getAll() {
     return await Contract.aggregate([
       {
@@ -31,8 +28,26 @@ export class ContractQueryService {
           as: "customer",
           pipeline: [
             {
+              $lookup: {
+                from: "employees",
+                localField: "manager",
+                foreignField: "_id",
+                as: "manager",
+                pipeline: [
+                  {
+                    $project: {
+                      firstName: 1,
+                      lastName: 1,
+                      fullName: 1,
+                    },
+                  },
+                ],
+              },
+            },
+            {
               $project: {
                 fullName: 1,
+                manager: 1,
               },
             },
           ],
@@ -81,7 +96,7 @@ export class ContractQueryService {
                   $filter: {
                     input: "$payments",
                     as: "p",
-                    cond: { $eq: ["$$p.isPaid", true] }
+                    cond: { $eq: ["$$p.isPaid", true] },
                   },
                 },
                 as: "pp",
@@ -137,7 +152,6 @@ export class ContractQueryService {
     ]);
   }
 
-  
   async getAllNewContract() {
     return await Contract.aggregate([
       {
@@ -212,9 +226,7 @@ export class ContractQueryService {
       {
         $addFields: {
           customerName: {
-            $concat: [
-              "$customer.fullName",
-            ],
+            $concat: ["$customer.fullName"],
           },
           sellerName: {
             $cond: [
@@ -270,7 +282,6 @@ export class ContractQueryService {
     ]);
   }
 
-  
   async getAllCompleted() {
     return await Contract.aggregate([
       {
@@ -347,7 +358,7 @@ export class ContractQueryService {
                   $filter: {
                     input: "$payments",
                     as: "p",
-                    cond: { $eq: ["$$p.isPaid", true] }
+                    cond: { $eq: ["$$p.isPaid", true] },
                   },
                 },
                 as: "pp",
@@ -403,16 +414,15 @@ export class ContractQueryService {
     ]);
   }
 
-  
   async getContractById(contractId: string) {
     let matchCondition: any = { isDeleted: false };
-    
+
     if (/^[0-9a-fA-F]{24}$/.test(contractId)) {
       matchCondition._id = new Types.ObjectId(contractId);
     } else {
       matchCondition.customId = contractId;
     }
-    
+
     const contract = await Contract.aggregate([
       {
         $match: matchCondition,
@@ -521,7 +531,7 @@ export class ContractQueryService {
                   $filter: {
                     input: "$payments",
                     as: "p",
-                    cond: { $eq: ["$$p.isPaid", true] }
+                    cond: { $eq: ["$$p.isPaid", true] },
                   },
                 },
                 as: "pp",
