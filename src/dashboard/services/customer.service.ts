@@ -207,6 +207,20 @@ class CustomerService {
       },
       {
         $lookup: {
+          from: "employees",
+          localField: "manager",
+          foreignField: "_id",
+          as: "manager",
+        },
+      },
+      {
+        $unwind: {
+          path: "$manager",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
           from: "contracts",
           localField: "_id",
           foreignField: "customer",
@@ -250,7 +264,16 @@ class CustomerService {
           telegramName: 1,
           telegramId: 1,
           auth: 1,
-          manager: 1,
+          manager: {
+            $ifNull: [
+              {
+                _id: "$manager._id",
+                firstName: "$manager.firstName",
+                lastName: "$manager.lastName",
+              },
+              null,
+            ],
+          },
           files: 1,
           editHistory: 1,
           isActive: 1,
