@@ -99,7 +99,8 @@ class CustomerService {
               if: { $ifNull: ["$manager._id", false] },
               then: {
                 _id: "$manager._id",
-                fullName: "$manager.fullName",
+                firstName: "$manager.firstName",
+                lastName: "$manager.lastName",
                 isDeleted: "$manager.isDeleted",
               },
               else: null,
@@ -183,7 +184,8 @@ class CustomerService {
             $ifNull: [
               {
                 _id: "$manager._id",
-                fullName: "$manager.fullName",
+                firstName: "$manager.firstName",
+                lastName: "$manager.lastName",
               },
               null,
             ],

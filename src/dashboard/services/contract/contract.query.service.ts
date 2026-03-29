@@ -64,6 +64,30 @@ export class ContractQueryService {
       {
         $addFields: {
           notes: { $ifNull: [{ $arrayElemAt: ["$notes.text", 0] }, null] },
+          managerFirstName: {
+            $arrayElemAt: [
+              {
+                $map: {
+                  input: { $arrayElemAt: ["$customer.manager", 0] },
+                  as: "m",
+                  in: "$$m.firstName",
+                },
+              },
+              0,
+            ],
+          },
+          managerLastName: {
+            $arrayElemAt: [
+              {
+                $map: {
+                  input: { $arrayElemAt: ["$customer.manager", 0] },
+                  as: "m",
+                  in: "$$m.lastName",
+                },
+              },
+              0,
+            ],
+          },
           customer: {
             $cond: [
               { $gt: [{ $size: "$customer" }, 0] },
@@ -111,6 +135,13 @@ export class ContractQueryService {
           remainingDebt: {
             $subtract: ["$totalPrice", "$totalPaid"],
           },
+          manager: {
+            $concat: [
+              { $ifNull: ["$managerFirstName", ""] },
+              " ",
+              { $ifNull: ["$managerLastName", ""] },
+            ],
+          },
         },
       },
       {
@@ -132,6 +163,7 @@ export class ContractQueryService {
           status: 1,
           customer: 1,
           customerName: 1,
+          manager: 1,
           notes: 1,
           payments: 1,
           totalPaid: 1,
@@ -228,6 +260,19 @@ export class ContractQueryService {
           customerName: {
             $concat: ["$customer.fullName"],
           },
+          managerName: {
+            $cond: [
+              { $ifNull: ["$customer.manager", false] },
+              {
+                $concat: [
+                  { $ifNull: ["$customer.manager.firstName", ""] },
+                  " ",
+                  { $ifNull: ["$customer.manager.lastName", ""] },
+                ],
+              },
+              "",
+            ],
+          },
           sellerName: {
             $cond: [
               { $gt: [{ $size: "$seller" }, 0] },
@@ -265,6 +310,7 @@ export class ContractQueryService {
           status: 1,
           customer: 1,
           customerName: 1,
+          manager: "$managerName",
           sellerName: 1,
           notes: 1,
           info: 1,
@@ -308,8 +354,26 @@ export class ContractQueryService {
           as: "customer",
           pipeline: [
             {
+              $lookup: {
+                from: "employees",
+                localField: "manager",
+                foreignField: "_id",
+                as: "manager",
+                pipeline: [
+                  {
+                    $project: {
+                      firstName: 1,
+                      lastName: 1,
+                      fullName: 1,
+                    },
+                  },
+                ],
+              },
+            },
+            {
               $project: {
                 fullName: 1,
+                manager: 1,
               },
             },
           ],
@@ -326,6 +390,30 @@ export class ContractQueryService {
       {
         $addFields: {
           notes: { $ifNull: [{ $arrayElemAt: ["$notes.text", 0] }, null] },
+          managerFirstName: {
+            $arrayElemAt: [
+              {
+                $map: {
+                  input: { $arrayElemAt: ["$customer.manager", 0] },
+                  as: "m",
+                  in: "$$m.firstName",
+                },
+              },
+              0,
+            ],
+          },
+          managerLastName: {
+            $arrayElemAt: [
+              {
+                $map: {
+                  input: { $arrayElemAt: ["$customer.manager", 0] },
+                  as: "m",
+                  in: "$$m.lastName",
+                },
+              },
+              0,
+            ],
+          },
           customer: {
             $cond: [
               { $gt: [{ $size: "$customer" }, 0] },
@@ -373,6 +461,13 @@ export class ContractQueryService {
           remainingDebt: {
             $subtract: ["$totalPrice", "$totalPaid"],
           },
+          manager: {
+            $concat: [
+              { $ifNull: ["$managerFirstName", ""] },
+              " ",
+              { $ifNull: ["$managerLastName", ""] },
+            ],
+          },
         },
       },
       {
@@ -394,6 +489,7 @@ export class ContractQueryService {
           status: 1,
           customer: 1,
           customerName: 1,
+          manager: 1,
           notes: 1,
           payments: 1,
           totalPaid: 1,
