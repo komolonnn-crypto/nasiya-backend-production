@@ -1,11 +1,9 @@
-
-
 import { PaymentStatus } from "../../../schemas/payment.schema";
 import { PAYMENT_CONSTANTS } from "./payment-constants";
 
 export const calculatePaymentStatus = (
   actualAmount: number,
-  expectedAmount: number
+  expectedAmount: number,
 ): PaymentStatus => {
   const difference = actualAmount - expectedAmount;
   const tolerance = PAYMENT_CONSTANTS.TOLERANCE;
@@ -23,7 +21,7 @@ export const calculatePaymentStatus = (
 
 export const calculatePaymentAmounts = (
   actualAmount: number,
-  expectedAmount: number
+  expectedAmount: number,
 ): {
   remainingAmount: number;
   excessAmount: number;
@@ -56,16 +54,15 @@ export const calculatePaymentAmounts = (
 export const applyPrepaidBalance = (
   actualAmount: number,
   expectedAmount: number,
-  prepaidBalance: number
+  prepaidBalance: number,
 ): {
   newActualAmount: number;
   prepaidUsed: number;
 } => {
   let prepaidUsed = 0;
 
-  if (prepaidBalance > PAYMENT_CONSTANTS.TOLERANCE && actualAmount < expectedAmount) {
-    const shortage = expectedAmount - actualAmount;
-    prepaidUsed = Math.min(shortage, prepaidBalance);
+  if (prepaidBalance > PAYMENT_CONSTANTS.TOLERANCE) {
+    prepaidUsed = Math.min(expectedAmount, prepaidBalance);
   }
 
   return {
@@ -76,11 +73,15 @@ export const applyPrepaidBalance = (
 
 export const validatePaymentAmount = (amount: number): void => {
   if (!amount || amount <= 0) {
-    throw new Error(PAYMENT_CONSTANTS.MIN_PAYMENT_AMOUNT + " dan katta bo'lishi kerak");
+    throw new Error(
+      PAYMENT_CONSTANTS.MIN_PAYMENT_AMOUNT + " dan katta bo'lishi kerak",
+    );
   }
 
   if (amount > PAYMENT_CONSTANTS.MAX_SINGLE_PAYMENT) {
-    throw new Error(`Maksimal to'lov ${PAYMENT_CONSTANTS.MAX_SINGLE_PAYMENT} $`);
+    throw new Error(
+      `Maksimal to'lov ${PAYMENT_CONSTANTS.MAX_SINGLE_PAYMENT} $`,
+    );
   }
 };
 
