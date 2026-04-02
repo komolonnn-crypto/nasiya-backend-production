@@ -5,6 +5,7 @@ import AuditLog, {
   AuditEntity,
   IAuditMetadata,
 } from "../schemas/audit-log.schema";
+import Contract from "../schemas/contract.schema";
 import logger from "../utils/logger";
 
 class AuditLogService {
@@ -746,6 +747,52 @@ class AuditLogService {
       AuditLog.countDocuments(query),
     ]);
 
+    const contractIds = new Set<string>();
+    activities.forEach((activity: any) => {
+      if (activity.metadata?.contractId) {
+        contractIds.add(activity.metadata.contractId);
+      }
+      if (activity.entity === "contract" && activity.entityId) {
+        contractIds.add(activity.entityId);
+      }
+      if (activity.metadata?.affectedEntities?.length) {
+        activity.metadata.affectedEntities.forEach((e: any) => {
+          if (e.entityType === "contract" && e.entityId) {
+            contractIds.add(e.entityId);
+          }
+        });
+      }
+    });
+
+    // Contract'larni bir marta so'rov bilan olish (faqat valid ObjectId'lar)
+    const validContractIds = Array.from(contractIds).filter((id) => {
+      try {
+        return Types.ObjectId.isValid(id);
+      } catch {
+        return false;
+      }
+    });
+
+    let contractIdMap = new Map<string, string>();
+
+    if (validContractIds.length > 0) {
+      try {
+        const contracts = await Contract.find({
+          _id: { $in: validContractIds.map((id) => new Types.ObjectId(id)) },
+        })
+          .select("_id customId")
+          .lean();
+
+        // Contract ID -> customId mapping yaratish
+        contracts.forEach((contract: any) => {
+          contractIdMap.set(contract._id.toString(), contract.customId);
+        });
+      } catch (error) {
+        logger.error("❌ Error fetching contracts for customId:", error);
+        // Xato bo'lsa ham davom etamiz, faqat customId bo'lmaydi
+      }
+    }
+
     const activitiesWithContractId = activities.map((activity: any) => {
       let contractId = activity.metadata?.contractId || null;
 
@@ -760,7 +807,9 @@ class AuditLogService {
         if (contractEntity) contractId = contractEntity.entityId || null;
       }
 
-      return { ...activity, contractId };
+      const customId = contractId ? contractIdMap.get(contractId) : null;
+
+      return { ...activity, contractId: customId || contractId };
     });
 
     return { activities: activitiesWithContractId, total };
