@@ -8,7 +8,6 @@ import logger from "../../utils/logger";
 import dayjs from "dayjs";
 
 class AuditLogController {
-  
   async getDailyActivity(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -99,7 +98,6 @@ class AuditLogController {
     }
   }
 
-  
   async getActivityStats(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -141,7 +139,6 @@ class AuditLogController {
     }
   }
 
-  
   async getEntityHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -178,7 +175,6 @@ class AuditLogController {
     }
   }
 
-  
   async getUserActivity(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -209,7 +205,6 @@ class AuditLogController {
     }
   }
 
-  
   async getFilteredActivity(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;
@@ -286,10 +281,27 @@ class AuditLogController {
         AuditLog.countDocuments(query),
       ]);
 
-      const activitiesWithContractId = activities.map((activity: any) => ({
-        ...activity,
-        contractId: activity.metadata?.contractId || null,
-      }));
+      const activitiesWithContractId = activities.map((activity: any) => {
+        let contractId = activity.metadata?.contractId || null;
+
+        let customerId = null;
+        if (activity.metadata?.customerId) {
+          customerId = activity.metadata.customerId;
+        } else if (activity.entity === "customer" && activity.entityId) {
+          customerId = activity.entityId;
+        } else if (activity.metadata?.affectedEntities?.length) {
+          const customerEntity = activity.metadata.affectedEntities.find(
+            (e: any) => e.entityType === "customer",
+          );
+          if (customerEntity) customerId = customerEntity.entityId;
+        }
+
+        return {
+          ...activity,
+          contractId,
+          customerId,
+        };
+      });
 
       res.status(200).json({
         status: "success",
@@ -310,7 +322,6 @@ class AuditLogController {
     }
   }
 
-  
   async getTodaySummary(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user as IJwtUser;

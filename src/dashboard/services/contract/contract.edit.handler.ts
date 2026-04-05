@@ -1,5 +1,3 @@
-
-
 import { Types } from "mongoose";
 
 import logger from "../../../utils/logger";
@@ -25,10 +23,12 @@ import {
 import auditLogService from "../../../services/audit-log.service";
 
 export class ContractEditHandler {
-  
   private async recheckContractStatus(contractId: string): Promise<void> {
     try {
-      const contract = await Contract.findById(contractId).populate("payments");
+      // @ts-ignore - Complex Mongoose populate type
+      const contract: any = (await Contract.findById(contractId).populate(
+        "payments",
+      )) as any;
       if (!contract) return;
 
       const totalPaid = (contract.payments as any[])
@@ -66,7 +66,6 @@ export class ContractEditHandler {
     }
   }
 
-  
   private async validateContractEdit(
     contract: any,
     changes: Array<{
@@ -83,27 +82,6 @@ export class ContractEditHandler {
         throw BaseError.BadRequest(
           `${change.field} manfiy bo'lishi mumkin emas`,
         );
-      }
-
-      if (change.field === "monthlyPayment") {
-        if (change.oldValue > 0 && change.newValue > 0) {
-          const changePercent = Math.abs(
-            (change.difference / change.oldValue) * 100,
-          );
-
-          logger.debug(
-            "📊 Monthly Payment Change Percent:",
-            changePercent.toFixed(2) + "%",
-          );
-
-          if (changePercent > 50) {
-            throw BaseError.BadRequest(
-              `Oylik to'lovni 50% dan ko'p o'zgartirish mumkin emas. ` +
-                `Hozirgi o'zgarish: ${changePercent.toFixed(1)}%\n` +
-                `Eski qiymat: ${change.oldValue}, Yangi qiymat: ${change.newValue}, Farq: ${change.difference}`,
-            );
-          }
-        }
       }
 
       if (change.field === "totalPrice" || change.field === "initialPayment") {
@@ -129,7 +107,6 @@ export class ContractEditHandler {
     logger.debug("✅ Validation passed");
   }
 
-  
   private async analyzeEditImpact(
     contract: any,
     changes: Array<{
@@ -215,7 +192,6 @@ export class ContractEditHandler {
     return impact;
   }
 
-  
   private async createAdditionalPayment(
     contract: any,
     originalPayment: any,
@@ -266,7 +242,6 @@ export class ContractEditHandler {
     }
   }
 
-  
   private async handleInitialPaymentChange(
     contract: any,
     diff: number,
@@ -334,7 +309,6 @@ export class ContractEditHandler {
     }
   }
 
-  
   private async handleTotalPriceChange(
     contract: any,
     newTotalPrice: number,
@@ -359,7 +333,6 @@ export class ContractEditHandler {
     }
   }
 
-  
   private async handleDebtorUpdate(
     contractId: Types.ObjectId,
     oldMonthlyPayment: number,
@@ -388,7 +361,6 @@ export class ContractEditHandler {
     }
   }
 
-  
   private async handleMonthlyPaymentChange(
     contract: any,
     oldAmount: number,
@@ -512,7 +484,6 @@ export class ContractEditHandler {
     return affectedPayments;
   }
 
-  
   private async saveEditHistory(
     contract: any,
     changes: Array<{
@@ -577,7 +548,6 @@ export class ContractEditHandler {
     }
   }
 
-  
   async update(data: UpdateContractDto, user: IJwtUser) {
     const startTime = Date.now();
 
