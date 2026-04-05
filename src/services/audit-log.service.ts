@@ -748,6 +748,8 @@ class AuditLogService {
     ]);
 
     const contractIds = new Set<string>();
+    const customerIds = new Set<string>();
+
     activities.forEach((activity: any) => {
       if (activity.metadata?.contractId) {
         contractIds.add(activity.metadata.contractId);
@@ -762,9 +764,19 @@ class AuditLogService {
           }
         });
       }
+
+      if (activity.entity === "customer" && activity.entityId) {
+        customerIds.add(activity.entityId);
+      }
+      if (activity.metadata?.affectedEntities?.length) {
+        activity.metadata.affectedEntities.forEach((e: any) => {
+          if (e.entityType === "customer" && e.entityId) {
+            customerIds.add(e.entityId);
+          }
+        });
+      }
     });
 
-    // Contract'larni bir marta so'rov bilan olish (faqat valid ObjectId'lar)
     const validContractIds = Array.from(contractIds).filter((id) => {
       try {
         return Types.ObjectId.isValid(id);
@@ -774,22 +786,28 @@ class AuditLogService {
     });
 
     let contractIdMap = new Map<string, string>();
+    let contractCustomerMap = new Map<string, string>();
+    let customIdToObjectIdMap = new Map<string, string>();
 
     if (validContractIds.length > 0) {
       try {
-        const contracts = await Contract.find({
+        // @ts-ignore - Complex Mongoose populate type
+        const contractQuery = Contract.find({
           _id: { $in: validContractIds.map((id) => new Types.ObjectId(id)) },
-        })
-          .select("_id customId")
-          .lean();
+        }).select("_id customId customer");
 
-        // Contract ID -> customId mapping yaratish
+        const contracts: any = (await contractQuery.lean()) as any;
+
         contracts.forEach((contract: any) => {
-          contractIdMap.set(contract._id.toString(), contract.customId);
+          const objectId = contract._id.toString();
+          contractIdMap.set(objectId, contract.customId);
+          customIdToObjectIdMap.set(contract.customId, objectId);
+          if (contract.customer) {
+            contractCustomerMap.set(objectId, contract.customer.toString());
+          }
         });
       } catch (error) {
         logger.error("❌ Error fetching contracts for customId:", error);
-        // Xato bo'lsa ham davom etamiz, faqat customId bo'lmaydi
       }
     }
 
@@ -809,7 +827,65 @@ class AuditLogService {
 
       const customId = contractId ? contractIdMap.get(contractId) : null;
 
-      return { ...activity, contractId: customId || contractId };
+      let customerId = null;
+
+      if (activity.metadata?.customerId) {
+        customerId = activity.metadata.customerId;
+      } else if (activity.entity === "customer" && activity.entityId) {
+        customerId = activity.entityId;
+      } else if (activity.metadata?.affectedEntities?.length) {
+        const customerEntity = activity.metadata.affectedEntities.find(
+          (e: any) => e.entityType === "customer",
+        );
+        if (customerEntity) customerId = customerEntity.entityId;
+      }
+
+      if (!customerId && contractId) {
+        customerId = contractCustomerMap.get(contractId) || null;
+
+        if (!customerId) {
+          const objectId = customIdToObjectIdMap.get(contractId);
+          if (objectId) {
+            customerId = contractCustomerMap.get(objectId) || null;
+          }
+        }
+      }
+
+      return {
+        _id: activity._id,
+        action: activity.action,
+        entity: activity.entity,
+        entityId: activity.entityId,
+        userId: activity.userId,
+        userType: activity.userType,
+        changes: activity.changes,
+        metadata:
+          activity.metadata ?
+            {
+              ...activity.metadata,
+
+              customerName:
+                activity.metadata.customerName ||
+                activity.metadata.affectedEntities?.find(
+                  (e: any) => e.entityType === "customer",
+                )?.entityName,
+              paymentCreatorName: activity.metadata.paymentCreatorName,
+              amount: activity.metadata.amount,
+              paymentType: activity.metadata.paymentType,
+              paymentStatus: activity.metadata.paymentStatus,
+              paymentMethod: activity.metadata.paymentMethod,
+              targetMonth: activity.metadata.targetMonth,
+              contractId: activity.metadata.contractId,
+            }
+          : undefined,
+        ipAddress: activity.ipAddress,
+        userAgent: activity.userAgent,
+        timestamp: activity.timestamp,
+        createdAt: activity.createdAt,
+        updatedAt: activity.updatedAt,
+        contractId: customId || contractId,
+        customerId,
+      };
     });
 
     return { activities: activitiesWithContractId, total };

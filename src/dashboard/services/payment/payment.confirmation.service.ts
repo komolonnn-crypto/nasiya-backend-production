@@ -437,6 +437,7 @@ export class PaymentConfirmationService extends PaymentBaseService {
         ],
         metadata: {
           customerName,
+          customerId: payment.customerId.toString(),
           contractId: contract.customId,
           paymentType: "monthly",
           paymentStatus: payment.status,
@@ -445,6 +446,23 @@ export class PaymentConfirmationService extends PaymentBaseService {
           targetMonth: payment.targetMonth,
           paymentCreatorId: paymentCreator?._id?.toString(),
           paymentCreatorName,
+          affectedEntities: [
+            {
+              entityType: "payment",
+              entityId: paymentId,
+              entityName: `${customerName} - ${payment.actualAmount || payment.amount}`,
+            },
+            {
+              entityType: "contract",
+              entityId: contract._id.toString(),
+              entityName: `Contract: ${customerName}`,
+            },
+            {
+              entityType: "customer",
+              entityId: payment.customerId.toString(),
+              entityName: customerName,
+            },
+          ],
           ...(excessAmountForLog > 0 && {
             originalAmount: originalAmountForLog,
             excessAmount: excessAmountForLog,
@@ -657,6 +675,7 @@ export class PaymentConfirmationService extends PaymentBaseService {
         ],
         metadata: {
           customerName,
+          customerId: payment.customerId.toString(),
           contractId: contract?.customId,
           paymentType: "monthly",
           paymentStatus: PaymentStatus.REJECTED,
@@ -665,6 +684,23 @@ export class PaymentConfirmationService extends PaymentBaseService {
           targetMonth: payment.targetMonth,
           paymentCreatorId: paymentCreator?._id?.toString(),
           paymentCreatorName,
+          affectedEntities: [
+            {
+              entityType: "payment",
+              entityId: paymentId,
+              entityName: `${customerName} - ${payment.actualAmount || payment.amount}`,
+            },
+            {
+              entityType: "contract",
+              entityId: contract?._id.toString(),
+              entityName: `Contract: ${customerName}`,
+            },
+            {
+              entityType: "customer",
+              entityId: payment.customerId.toString(),
+              entityName: customerName,
+            },
+          ],
         },
       });
 
