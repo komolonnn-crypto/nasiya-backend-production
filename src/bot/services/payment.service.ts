@@ -1,10 +1,18 @@
 import Contract from "../../schemas/contract.schema";
 import Employee, { IEmployee } from "../../schemas/employee.schema";
 import IJwtUser from "../../types/user";
-import Payment, { IPayment, PaymentStatus, PaymentType } from "../../schemas/payment.schema";
+import Payment, {
+  IPayment,
+  PaymentStatus,
+  PaymentType,
+} from "../../schemas/payment.schema";
 import { Debtor } from "../../schemas/debtor.schema";
 import BaseError from "../../utils/base.error";
-import { PayDebtDto, PayInitialDebtDto, PayNewDebtDto } from "../../validators/payment";
+import {
+  PayDebtDto,
+  PayInitialDebtDto,
+  PayNewDebtDto,
+} from "../../validators/payment";
 import Notes from "../../schemas/notes.schema";
 import { Balance } from "../../schemas/balance.schema";
 import logger from "../../utils/logger";
@@ -15,7 +23,7 @@ class PaymentService {
     changes: {
       dollar?: number;
       sum?: number;
-    }
+    },
   ) {
     const balance = await Balance.findOne({ managerId });
 
@@ -36,7 +44,7 @@ class PaymentService {
 
   async payDebt(payData: PayDebtDto, user: IJwtUser) {
     const existingDebtor = await Debtor.findById(payData.id).populate(
-      "contractId"
+      "contractId",
     );
 
     if (!existingDebtor) {
@@ -58,23 +66,22 @@ class PaymentService {
     await notes.save();
 
     const Payment = (await import("../../schemas/payment.schema")).default;
-    const { PaymentType, PaymentStatus } = await import(
-      "../../schemas/payment.schema"
-    );
+    const { PaymentType, PaymentStatus } =
+      await import("../../schemas/payment.schema");
     const Contract = (await import("../../schemas/contract.schema")).default;
 
     const contract = await Contract.findOne({
       _id: existingDebtor.contractId._id,
       isDeleted: false,
-      isActive: true
-    }).populate('payments');
+      isActive: true,
+    }).populate("payments");
 
     if (!contract) {
       throw BaseError.NotFoundError("Shartnoma topilmadi");
     }
 
     const paidMonthlyPayments = (contract.payments as any[]).filter(
-      (p) => p.paymentType === PaymentType.MONTHLY && p.isPaid
+      (p) => p.paymentType === PaymentType.MONTHLY && p.isPaid,
     );
     const calculatedTargetMonth = paidMonthlyPayments.length + 1;
 
@@ -95,10 +102,13 @@ class PaymentService {
       actualAmount = amountPaid;
     }
 
-    if (calculatedRemainingAmount > 0 && payData.paymentMethod !== "from_zapas") {
+    if (
+      calculatedRemainingAmount > 0 &&
+      payData.paymentMethod !== "from_zapas"
+    ) {
       if (!payData.nextPaymentDate) {
         throw BaseError.BadRequest(
-          "Kam to'lov qilganda keyingi to'lov sanasi majburiy!"
+          "Kam to'lov qilganda keyingi to'lov sanasi majburiy!",
         );
       }
 
@@ -109,10 +119,15 @@ class PaymentService {
 
       if (nextDate <= today) {
         throw BaseError.BadRequest(
-          "Keyingi to'lov sanasi bugundan keyingi kun bo'lishi kerak!"
+          "Keyingi to'lov sanasi bugundan keyingi kun bo'lishi kerak!",
         );
       }
+    }
 
+    if (calculatedExcessAmount > 0 && !payData.excessHandling) {
+      throw BaseError.BadRequest(
+        "Ortiqcha to'lovni qanday o'tkazishni tanlang: 'keyingi oy' yoki 'zapas'",
+      );
     }
 
     const paymentDoc = await Payment.create({
@@ -130,7 +145,8 @@ class PaymentService {
       excessAmount: calculatedExcessAmount,
       remainingAmount: calculatedRemainingAmount,
       targetMonth: payData.targetMonth || calculatedTargetMonth,
-      nextPaymentDate: payData.nextPaymentDate ? new Date(payData.nextPaymentDate) : undefined,
+      nextPaymentDate:
+        payData.nextPaymentDate ? new Date(payData.nextPaymentDate) : undefined,
       excessHandling: payData.excessHandling,
     });
 
@@ -149,8 +165,8 @@ class PaymentService {
     const existingContract = await Contract.findOne({
       _id: payData.id,
       isDeleted: false,
-      isActive: true
-    }).populate('payments');
+      isActive: true,
+    }).populate("payments");
 
     if (!existingContract) {
       throw BaseError.NotFoundError("Shartnoma topilmadi yoki o'chirilgan");
@@ -170,12 +186,11 @@ class PaymentService {
     await notes.save();
 
     const Payment = (await import("../../schemas/payment.schema")).default;
-    const { PaymentType, PaymentStatus } = await import(
-      "../../schemas/payment.schema"
-    );
+    const { PaymentType, PaymentStatus } =
+      await import("../../schemas/payment.schema");
 
     const paidMonthlyPayments = (existingContract.payments as any[]).filter(
-      (p) => p.paymentType === PaymentType.MONTHLY && p.isPaid
+      (p) => p.paymentType === PaymentType.MONTHLY && p.isPaid,
     );
     const calculatedTargetMonth = paidMonthlyPayments.length + 1;
     const amountPaid = payData.amount;
@@ -185,9 +200,16 @@ class PaymentService {
     let calculatedRemainingAmount = 0;
     let actualAmount = amountPaid;
 
+    logger.debug(
+      `🔍 payNewDebt LOG: amountPaid=${amountPaid}, expectedMonthlyPayment=${expectedMonthlyPayment}`,
+    );
+
     if (amountPaid > expectedMonthlyPayment) {
       calculatedExcessAmount = amountPaid - expectedMonthlyPayment;
       actualAmount = amountPaid;
+      logger.debug(
+        `✅ OVERPAYMENT: excessAmount=${calculatedExcessAmount}, actualAmount=${actualAmount}, excessHandling=${payData.excessHandling}`,
+      );
     } else if (amountPaid < expectedMonthlyPayment) {
       calculatedRemainingAmount = expectedMonthlyPayment - amountPaid;
       actualAmount = amountPaid;
@@ -195,10 +217,13 @@ class PaymentService {
       actualAmount = amountPaid;
     }
 
-    if (calculatedRemainingAmount > 0 && payData.paymentMethod !== "from_zapas") {
+    if (
+      calculatedRemainingAmount > 0 &&
+      payData.paymentMethod !== "from_zapas"
+    ) {
       if (!payData.nextPaymentDate) {
         throw BaseError.BadRequest(
-          "Kam to'lov qilganda keyingi to'lov sanasi majburiy!"
+          "Kam to'lov qilganda keyingi to'lov sanasi majburiy!",
         );
       }
 
@@ -209,25 +234,37 @@ class PaymentService {
 
       if (nextDate <= today) {
         throw BaseError.BadRequest(
-          "Keyingi to'lov sanasi bugundan keyingi kun bo'lishi kerak!"
+          "Keyingi to'lov sanasi bugundan keyingi kun bo'lishi kerak!",
         );
       }
+    }
 
+    // 🔧 OVERPAYMENT VALIDATION: excessHandling majboriy
+    if (calculatedExcessAmount > 0 && !payData.excessHandling) {
+      throw BaseError.BadRequest(
+        "Ortiqcha to'lovni qanday o'tkazishni tanlang: 'keyingi oy' yoki 'zapas'",
+      );
     }
 
     const finalTargetMonth = payData.targetMonth || calculatedTargetMonth;
 
     const existingScheduledPayment = (existingContract.payments as any[]).find(
-      (p) => Number(p.targetMonth) === Number(finalTargetMonth) &&
+      (p) =>
+        Number(p.targetMonth) === Number(finalTargetMonth) &&
         p.paymentType === PaymentType.MONTHLY &&
         (p.status === PaymentStatus.SCHEDULED || p.status === null) &&
-        !p.isPaid
+        !p.isPaid,
     );
 
     let paymentDoc;
 
     if (existingScheduledPayment) {
-      logger.info(`📅 Found existing SCHEDULED payment for month ${finalTargetMonth}, converting to PENDING`);
+      logger.info(
+        `📅 Found existing SCHEDULED payment for month ${finalTargetMonth}, converting to PENDING`,
+      );
+      logger.debug(
+        `   📝 UPDATE with: actualAmount=${actualAmount}, excessAmount=${calculatedExcessAmount}, excessHandling=${payData.excessHandling}`,
+      );
 
       paymentDoc = await Payment.findByIdAndUpdate(
         existingScheduledPayment._id,
@@ -242,13 +279,33 @@ class PaymentService {
           expectedAmount: expectedMonthlyPayment,
           excessAmount: calculatedExcessAmount,
           remainingAmount: calculatedRemainingAmount,
-          nextPaymentDate: payData.nextPaymentDate ? new Date(payData.nextPaymentDate) : undefined,
+          nextPaymentDate:
+            payData.nextPaymentDate ?
+              new Date(payData.nextPaymentDate)
+            : undefined,
           excessHandling: payData.excessHandling,
         },
-        { new: true }
+        { new: true },
       );
 
+      logger.debug(
+        `   ✅ Updated payment saved: actualAmount=${paymentDoc?.actualAmount}, excessAmount=${paymentDoc?.excessAmount}`,
+      );
+
+      if (paymentDoc) {
+        paymentDoc.actualAmount = actualAmount;
+        paymentDoc.excessAmount = calculatedExcessAmount;
+        paymentDoc.excessHandling = payData.excessHandling;
+        await paymentDoc.save();
+        logger.debug(
+          `   🔧 RE-SAVED: actualAmount=${paymentDoc.actualAmount}, excessAmount=${paymentDoc.excessAmount}, excessHandling=${paymentDoc.excessHandling}`,
+        );
+      }
     } else {
+      logger.debug(
+        `   📝 CREATE NEW: actualAmount=${actualAmount}, excessAmount=${calculatedExcessAmount}, excessHandling=${payData.excessHandling}`,
+      );
+
       paymentDoc = await Payment.create({
         amount: expectedMonthlyPayment,
         actualAmount: actualAmount,
@@ -264,16 +321,25 @@ class PaymentService {
         excessAmount: calculatedExcessAmount,
         remainingAmount: calculatedRemainingAmount,
         targetMonth: finalTargetMonth,
-        nextPaymentDate: payData.nextPaymentDate ? new Date(payData.nextPaymentDate) : undefined,
+        nextPaymentDate:
+          payData.nextPaymentDate ?
+            new Date(payData.nextPaymentDate)
+          : undefined,
         excessHandling: payData.excessHandling,
       });
+
+      logger.debug(
+        `   ✅ CREATED payment: actualAmount=${paymentDoc?.actualAmount}, excessAmount=${paymentDoc?.excessAmount}`,
+      );
 
       existingContract.payments.push(paymentDoc._id as any);
       await existingContract.save();
     }
 
     if (!paymentDoc) {
-      throw BaseError.InternalServerError("To'lov yaratishda xatolik yuz berdi");
+      throw BaseError.InternalServerError(
+        "To'lov yaratishda xatolik yuz berdi",
+      );
     }
 
     return {
@@ -286,7 +352,8 @@ class PaymentService {
 
   async payInitialPayment(payData: PayInitialDebtDto, user: IJwtUser) {
     const Payment = (await import("../../schemas/payment.schema")).default;
-    const { PaymentType, PaymentStatus } = await import("../../schemas/payment.schema");
+    const { PaymentType, PaymentStatus } =
+      await import("../../schemas/payment.schema");
 
     const existingContract = await Contract.findOne({
       _id: payData.id,
@@ -301,17 +368,21 @@ class PaymentService {
     const allPayments = existingContract.payments as any[];
 
     const paidInitial = allPayments.find(
-      (p) => p.paymentType === PaymentType.INITIAL && p.isPaid
+      (p) => p.paymentType === PaymentType.INITIAL && p.isPaid,
     );
     if (paidInitial) {
       throw BaseError.BadRequest("Boshlang'ich to'lov allaqachon to'langan");
     }
 
     const pendingInitial = allPayments.find(
-      (p) => p.paymentType === PaymentType.INITIAL && p.status === PaymentStatus.PENDING
+      (p) =>
+        p.paymentType === PaymentType.INITIAL &&
+        p.status === PaymentStatus.PENDING,
     );
     if (pendingInitial) {
-      throw BaseError.BadRequest("Boshlang'ich to'lov allaqachon kassa tasdiqlashini kutmoqda");
+      throw BaseError.BadRequest(
+        "Boshlang'ich to'lov allaqachon kassa tasdiqlashini kutmoqda",
+      );
     }
 
     const customer = existingContract.customer;
@@ -329,15 +400,20 @@ class PaymentService {
 
     const amountPaid = payData.amount;
     const requiredInitialPayment = existingContract.initialPayment || 0;
-    const calculatedExcessAmount = requiredInitialPayment > 0 && amountPaid > requiredInitialPayment
-      ? amountPaid - requiredInitialPayment : 0;
-    const calculatedRemainingAmount = requiredInitialPayment > 0 && amountPaid < requiredInitialPayment
-      ? requiredInitialPayment - amountPaid : 0;
+    const calculatedExcessAmount =
+      requiredInitialPayment > 0 && amountPaid > requiredInitialPayment ?
+        amountPaid - requiredInitialPayment
+      : 0;
+    const calculatedRemainingAmount =
+      requiredInitialPayment > 0 && amountPaid < requiredInitialPayment ?
+        requiredInitialPayment - amountPaid
+      : 0;
 
     const existingScheduled = allPayments.find(
-      (p) => p.paymentType === PaymentType.INITIAL &&
+      (p) =>
+        p.paymentType === PaymentType.INITIAL &&
         (p.status === PaymentStatus.SCHEDULED || p.status === null) &&
-        !p.isPaid
+        !p.isPaid,
     );
 
     let paymentDoc;
@@ -355,7 +431,7 @@ class PaymentService {
           excessAmount: calculatedExcessAmount,
           remainingAmount: calculatedRemainingAmount,
         },
-        { new: true }
+        { new: true },
       );
     } else {
       paymentDoc = await Payment.create({
@@ -369,7 +445,8 @@ class PaymentService {
         customerId: customer,
         managerId: manager._id,
         status: PaymentStatus.PENDING,
-        expectedAmount: requiredInitialPayment > 0 ? requiredInitialPayment : amountPaid,
+        expectedAmount:
+          requiredInitialPayment > 0 ? requiredInitialPayment : amountPaid,
         excessAmount: calculatedExcessAmount,
         remainingAmount: calculatedRemainingAmount,
         targetMonth: 0,
@@ -380,12 +457,15 @@ class PaymentService {
     }
 
     if (!paymentDoc) {
-      throw BaseError.InternalServerError("To'lov yaratishda xatolik yuz berdi");
+      throw BaseError.InternalServerError(
+        "To'lov yaratishda xatolik yuz berdi",
+      );
     }
 
     return {
       status: "success",
-      message: "Boshlang'ich to'lov qabul qilindi, kassa tasdiqlashi kutilmoqda",
+      message:
+        "Boshlang'ich to'lov qabul qilindi, kassa tasdiqlashi kutilmoqda",
       paymentId: paymentDoc._id,
       isPending: true,
     };
@@ -429,11 +509,12 @@ class PaymentService {
             phone: customer.phoneNumber,
           },
           notes: notes?.text || "",
-          hoursAgo: payment.createdAt
-            ? Math.floor(
-              (Date.now() - new Date(payment.createdAt).getTime()) /
-              (1000 * 60 * 60)
-            )
+          hoursAgo:
+            payment.createdAt ?
+              Math.floor(
+                (Date.now() - new Date(payment.createdAt).getTime()) /
+                  (1000 * 60 * 60),
+              )
             : 0,
         };
       });
@@ -445,12 +526,11 @@ class PaymentService {
       };
     } catch (error) {
       throw BaseError.InternalServerError(
-        "PENDING to'lovlarni olishda xatolik"
+        "PENDING to'lovlarni olishda xatolik",
       );
     }
   }
 
-  
   async getMyPendingStats(user: IJwtUser) {
     try {
       const pendingPayments = await Payment.find({
@@ -461,27 +541,27 @@ class PaymentService {
 
       const totalAmount = pendingPayments.reduce(
         (sum, p) => sum + (p.actualAmount || 0),
-        0
+        0,
       );
 
       const now = Date.now();
       const lessThan12h = pendingPayments.filter(
         (p) =>
           p.createdAt &&
-          now - new Date(p.createdAt).getTime() < 12 * 60 * 60 * 1000
+          now - new Date(p.createdAt).getTime() < 12 * 60 * 60 * 1000,
       ).length;
 
       const moreThan12h = pendingPayments.filter(
         (p) =>
           p.createdAt &&
           now - new Date(p.createdAt).getTime() >= 12 * 60 * 60 * 1000 &&
-          now - new Date(p.createdAt).getTime() < 24 * 60 * 60 * 1000
+          now - new Date(p.createdAt).getTime() < 24 * 60 * 60 * 1000,
       ).length;
 
       const moreThan24h = pendingPayments.filter(
         (p) =>
           p.createdAt &&
-          now - new Date(p.createdAt).getTime() >= 24 * 60 * 60 * 1000
+          now - new Date(p.createdAt).getTime() >= 24 * 60 * 60 * 1000,
       ).length;
 
       return {
@@ -504,13 +584,13 @@ class PaymentService {
     targetMonth: number,
     reminderDate: string,
     user: IJwtUser,
-    reminderComment?: string
+    reminderComment?: string,
   ) {
     try {
       const contract = await Contract.findOne({
         _id: contractId,
         isDeleted: false,
-        isActive: true
+        isActive: true,
       })
         .populate("payments")
         .populate("customer");
@@ -523,20 +603,20 @@ class PaymentService {
       const contractManagerId = customer?.manager?.toString();
 
       if (contractManagerId !== user.sub) {
-        logger.warn(`403 Forbidden: Contract manager (${contractManagerId}) !== User (${user.sub})`);
+        logger.warn(
+          `403 Forbidden: Contract manager (${contractManagerId}) !== User (${user.sub})`,
+        );
         throw BaseError.ForbiddenError(
-          "Siz faqat o'z mijozlaringizning shartnomalariga reminder qo'yishingiz mumkin"
+          "Siz faqat o'z mijozlaringizning shartnomalariga reminder qo'yishingiz mumkin",
         );
       }
 
-      const payment = (contract.payments as any[]).find(
-        (p: any) => {
-          const monthMatch = Number(p.targetMonth) === Number(targetMonth);
-          const typeMatch = p.paymentType === PaymentType.MONTHLY;
+      const payment = (contract.payments as any[]).find((p: any) => {
+        const monthMatch = Number(p.targetMonth) === Number(targetMonth);
+        const typeMatch = p.paymentType === PaymentType.MONTHLY;
 
-          return monthMatch && typeMatch;
-        }
-      );
+        return monthMatch && typeMatch;
+      });
 
       const reminder = new Date(reminderDate);
       const today = new Date();
@@ -544,7 +624,9 @@ class PaymentService {
       reminder.setHours(0, 0, 0, 0);
 
       if (reminder < today) {
-        throw BaseError.BadRequest("Eslatma sanasi bugundan oldingi kun bo'lmasligi kerak");
+        throw BaseError.BadRequest(
+          "Eslatma sanasi bugundan oldingi kun bo'lmasligi kerak",
+        );
       }
 
       let paymentId: string;
@@ -589,11 +671,12 @@ class PaymentService {
           reminderDate: reminder,
           reminderComment: reminderComment || null,
         });
-        
+
         const postponedDays = Math.ceil(
-          (reminder.getTime() - paymentDueDate.getTime()) / (1000 * 60 * 60 * 24)
+          (reminder.getTime() - paymentDueDate.getTime()) /
+            (1000 * 60 * 60 * 24),
         );
-        
+
         const reminderNotification = await Payment.create({
           amount: 0,
           actualAmount: 0,
@@ -619,7 +702,9 @@ class PaymentService {
         paymentId = newPayment._id.toString();
       } else {
         if (payment.isPaid) {
-          throw BaseError.BadRequest("To'langan to'lovga reminder qo'yib bo'lmaydi");
+          throw BaseError.BadRequest(
+            "To'langan to'lovga reminder qo'yib bo'lmaydi",
+          );
         }
 
         await Payment.deleteMany({
@@ -634,14 +719,14 @@ class PaymentService {
           reminderDate: reminder,
           reminderComment: reminderComment || null,
         });
-        
+
         const paymentDate = new Date((payment as any).date);
         const postponedDays = Math.ceil(
-          (reminder.getTime() - paymentDate.getTime()) / (1000 * 60 * 60 * 24)
+          (reminder.getTime() - paymentDate.getTime()) / (1000 * 60 * 60 * 24),
         );
-        
+
         const existingNotes = await Notes.findById((payment as any).notes);
-        
+
         let notesId;
         if (existingNotes) {
           existingNotes.text = reminderComment || existingNotes.text;
@@ -649,14 +734,14 @@ class PaymentService {
           notesId = existingNotes._id;
         } else {
           const newNotes = new Notes({
-            text: reminderComment || 'Eslatma (izoh yo\'q)',
+            text: reminderComment || "Eslatma (izoh yo'q)",
             customer: customer._id,
             createBy: user.sub,
           });
           await newNotes.save();
           notesId = newNotes._id;
         }
-        
+
         const reminderNotification = await Payment.create({
           amount: 0,
           actualAmount: 0,
@@ -692,13 +777,13 @@ class PaymentService {
   async removePaymentReminder(
     contractId: string,
     targetMonth: number,
-    user: IJwtUser
+    user: IJwtUser,
   ) {
     try {
       const contract = await Contract.findOne({
         _id: contractId,
         isDeleted: false,
-        isActive: true
+        isActive: true,
       })
         .populate("payments")
         .populate("customer");
@@ -711,14 +796,18 @@ class PaymentService {
       const contractManagerId = customer?.manager?.toString();
 
       if (contractManagerId !== user.sub) {
-        logger.warn(`403 Forbidden: Contract manager (${contractManagerId}) !== User (${user.sub})`);
+        logger.warn(
+          `403 Forbidden: Contract manager (${contractManagerId}) !== User (${user.sub})`,
+        );
         throw BaseError.ForbiddenError(
-          "Siz faqat o'z mijozlaringizning shartnomalaridan reminder o'chirishingiz mumkin"
+          "Siz faqat o'z mijozlaringizning shartnomalaridan reminder o'chirishingiz mumkin",
         );
       }
 
       const payment = (contract.payments as any[]).find(
-        (p: any) => Number(p.targetMonth) === Number(targetMonth) && p.paymentType === PaymentType.MONTHLY
+        (p: any) =>
+          Number(p.targetMonth) === Number(targetMonth) &&
+          p.paymentType === PaymentType.MONTHLY,
       );
 
       if (!payment) {
@@ -756,14 +845,15 @@ class PaymentService {
     }
   }
 
-  
   async payRemaining(data: any, user: IJwtUser) {
     try {
       const contract = await Contract.findOne({
         _id: data.contractId,
         isDeleted: false,
-        isActive: true
-      }).populate("payments").populate("customer");
+        isActive: true,
+      })
+        .populate("payments")
+        .populate("customer");
 
       if (!contract) {
         throw BaseError.NotFoundError("Shartnoma topilmadi");
@@ -776,12 +866,14 @@ class PaymentService {
 
       const allPayments = contract.payments as any[];
       const paidPayments = allPayments.filter(
-        (p) => p.paymentType === PaymentType.MONTHLY && p.isPaid
+        (p) => p.paymentType === PaymentType.MONTHLY && p.isPaid,
       );
       const currentMonth = paidPayments.length + 1;
 
       const existingPayment = allPayments.find(
-        (p) => p.targetMonth === currentMonth && p.paymentType === PaymentType.MONTHLY
+        (p) =>
+          p.targetMonth === currentMonth &&
+          p.paymentType === PaymentType.MONTHLY,
       );
 
       if (!existingPayment) {
@@ -792,7 +884,8 @@ class PaymentService {
         throw BaseError.BadRequest("Bu to'lov allaqachon to'langan");
       }
 
-      const remainingAmount = existingPayment.remainingAmount || existingPayment.amount;
+      const remainingAmount =
+        existingPayment.remainingAmount || existingPayment.amount;
       const amountPaid = data.amount;
 
       if (amountPaid <= 0) {
@@ -806,16 +899,19 @@ class PaymentService {
       });
       await notes.save();
 
-      existingPayment.actualAmount = (existingPayment.actualAmount || 0) + amountPaid;
+      existingPayment.actualAmount =
+        (existingPayment.actualAmount || 0) + amountPaid;
       existingPayment.status = PaymentStatus.PENDING;
       existingPayment.notes = notes._id;
       existingPayment.managerId = manager._id;
-      
+
       const newRemainingAmount = remainingAmount - amountPaid;
-      const excessAmount = amountPaid > remainingAmount ? amountPaid - remainingAmount : 0;
+      const excessAmount =
+        amountPaid > remainingAmount ? amountPaid - remainingAmount : 0;
 
       existingPayment.remainingAmount = Math.max(0, newRemainingAmount);
-      existingPayment.excessAmount = (existingPayment.excessAmount || 0) + excessAmount;
+      existingPayment.excessAmount =
+        (existingPayment.excessAmount || 0) + excessAmount;
 
       await existingPayment.save();
 
@@ -830,14 +926,15 @@ class PaymentService {
     }
   }
 
-  
   async payAllRemaining(data: any, user: IJwtUser) {
     try {
       const contract = await Contract.findOne({
         _id: data.contractId,
         isDeleted: false,
-        isActive: true
-      }).populate("payments").populate("customer");
+        isActive: true,
+      })
+        .populate("payments")
+        .populate("customer");
 
       if (!contract) {
         throw BaseError.NotFoundError("Shartnoma topilmadi");
@@ -850,7 +947,7 @@ class PaymentService {
 
       const allPayments = contract.payments as any[];
       const unpaidPayments = allPayments.filter(
-        (p) => p.paymentType === PaymentType.MONTHLY && !p.isPaid
+        (p) => p.paymentType === PaymentType.MONTHLY && !p.isPaid,
       );
 
       if (unpaidPayments.length === 0) {
@@ -859,7 +956,7 @@ class PaymentService {
 
       const totalRemaining = unpaidPayments.reduce(
         (sum, p) => sum + (p.remainingAmount || p.amount),
-        0
+        0,
       );
 
       const amountPaid = data.amount;
@@ -889,9 +986,10 @@ class PaymentService {
         payment.notes = notes._id;
         payment.managerId = manager._id;
         payment.remainingAmount = Math.max(0, paymentDue - paymentAmount);
-        
+
         if (paymentAmount > paymentDue) {
-          payment.excessAmount = (payment.excessAmount || 0) + (paymentAmount - paymentDue);
+          payment.excessAmount =
+            (payment.excessAmount || 0) + (paymentAmount - paymentDue);
         }
 
         await payment.save();

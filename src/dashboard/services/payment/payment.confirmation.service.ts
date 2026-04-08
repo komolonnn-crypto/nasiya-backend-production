@@ -144,7 +144,15 @@ export class PaymentConfirmationService extends PaymentBaseService {
       let originalAmountForLog = 0;
       let prepaidRecordIdForLog: string | undefined;
 
+      logger.debug(
+        `🔍 CONFIRMATION: payment.actualAmount=${payment.actualAmount}, payment.expectedAmount=${payment.expectedAmount}, payment.excessAmount=${payment.excessAmount}, isAmountPositive=${isAmountPositive(payment.excessAmount || 0)}`,
+      );
+
       if (payment.excessAmount && isAmountPositive(payment.excessAmount)) {
+        logger.debug(
+          `✅ OVERPAID BLOCK ENTERED: excessAmount=${payment.excessAmount}`,
+        );
+
         const originalActualAmount = payment.actualAmount || payment.amount;
         const correctedActualAmount = payment.expectedAmount || payment.amount;
         const excessAmountValue = originalActualAmount - correctedActualAmount;
@@ -161,7 +169,25 @@ export class PaymentConfirmationService extends PaymentBaseService {
           `✅ Current payment actualAmount corrected: ${originalActualAmount} → ${payment.actualAmount}`,
         );
 
-        if (payment.excessHandling === ExcessHandling.NEXT_MONTH) {
+        logger.debug(
+          `🔍 excessAmountValue=${excessAmountValue}, excessHandling=${payment.excessHandling}`,
+        );
+
+        if (!payment.excessHandling) {
+          logger.warn(
+            `⚠️ XATO: Overpayment bor lekin excessHandling yo'q! ${excessAmountValue.toFixed(2)}$ zapasga qo'shiladi (default)`,
+          );
+          await this.addToPrepaidBalance(excessAmountValue, contract);
+          const prepaidRecord = await this.recordPrepaidTransaction(
+            excessAmountValue,
+            payment,
+            contract,
+            payment.paymentMethod,
+            payment.notes ? (payment.notes as any).text : undefined,
+          );
+          if (prepaidRecord?._id)
+            prepaidRecordIdForLog = prepaidRecord._id.toString();
+        } else if (payment.excessHandling === ExcessHandling.NEXT_MONTH) {
           logger.debug(
             `🔄 excessHandling=next_month: ${excessAmountValue.toFixed(2)}$ keyingi oyga o'tkaziladi`,
           );
@@ -172,7 +198,8 @@ export class PaymentConfirmationService extends PaymentBaseService {
               (p) =>
                 p.paymentType === PaymentType.MONTHLY &&
                 !p.isPaid &&
-                p.status === PaymentStatus.SCHEDULED &&
+                (p.status === PaymentStatus.SCHEDULED ||
+                  p.status === PaymentStatus.PENDING) &&
                 (p.targetMonth || 0) > (payment.targetMonth || 0),
             )
             .sort(
@@ -206,18 +233,74 @@ export class PaymentConfirmationService extends PaymentBaseService {
             }
           } else {
             logger.debug(
-              `⚠️ Keyingi SCHEDULED oy topilmadi — zapasga qo'shiladi`,
+              `📅 Keyingi SCHEDULED oy topilmadi, avtomatik yaratilmoqda...`,
             );
-            await this.addToPrepaidBalance(excessAmountValue, contract);
-            const prepaidRecord = await this.recordPrepaidTransaction(
-              excessAmountValue,
-              payment,
-              contract,
-              payment.paymentMethod,
-              payment.notes ? (payment.notes as any).text : undefined,
-            );
-            if (prepaidRecord?._id)
-              prepaidRecordIdForLog = prepaidRecord._id.toString();
+
+            try {
+              const nextMonthNumber = (payment.targetMonth || 0) + 1;
+              const newNextPaymentAmount = Math.max(
+                0,
+                contract.monthlyPayment - excessAmountValue,
+              );
+
+              logger.debug(
+                `📝 Creating auto payment for month ${nextMonthNumber}: amount=${newNextPaymentAmount}$`,
+              );
+
+              const autoNextPayment = await Payment.create({
+                amount: newNextPaymentAmount,
+                expectedAmount: newNextPaymentAmount,
+                date: new Date(),
+                isPaid: false,
+                paymentType: PaymentType.MONTHLY,
+                notes: payment.notes,
+                customerId: payment.customerId,
+                managerId: payment.managerId,
+                contractId: payment.contractId,
+                status:
+                  newNextPaymentAmount <= 0 ?
+                    PaymentStatus.PAID
+                  : PaymentStatus.SCHEDULED,
+                targetMonth: nextMonthNumber,
+                excessHandling: payment.excessHandling,
+              });
+
+              if (newNextPaymentAmount <= 0) {
+                autoNextPayment.isPaid = true;
+                autoNextPayment.confirmedAt = new Date();
+                autoNextPayment.confirmedBy = payment.confirmedBy;
+                await autoNextPayment.save();
+                logger.debug(
+                  `✅ Auto-created payment for month ${nextMonthNumber} marked as PAID (amount=$0)`,
+                );
+              } else {
+                await autoNextPayment.save();
+                logger.debug(
+                  `✅ Auto-created payment for month ${nextMonthNumber}: ${newNextPaymentAmount.toFixed(2)}$`,
+                );
+              }
+
+              (contract.payments as any[]).push(autoNextPayment._id);
+              logger.debug(
+                `✅ Auto-created next month (${nextMonthNumber}-oy) to'lovi: ${excessAmountValue.toFixed(2)}$ kamaytirildi → yangi summa: ${newNextPaymentAmount.toFixed(2)}$`,
+              );
+            } catch (autoCreateError) {
+              logger.error(`❌ AUTO-CREATE ERROR: ${autoCreateError}`);
+              logger.warn(
+                `⚠️ Auto-create failed, falling back to prepaid balance...`,
+              );
+              // Fallback to prepaid
+              await this.addToPrepaidBalance(excessAmountValue, contract);
+              const prepaidRecord = await this.recordPrepaidTransaction(
+                excessAmountValue,
+                payment,
+                contract,
+                payment.paymentMethod,
+                payment.notes ? (payment.notes as any).text : undefined,
+              );
+              if (prepaidRecord?._id)
+                prepaidRecordIdForLog = prepaidRecord._id.toString();
+            }
           }
         } else {
           logger.debug(
@@ -411,6 +494,8 @@ export class PaymentConfirmationService extends PaymentBaseService {
       const customer = await Customer.findById(payment.customerId);
       const customerName = customer?.fullName || "Noma'lum mijoz";
 
+      const managerIdBeforePopulate = payment.managerId.toString();
+
       await payment.populate("managerId");
       const paymentCreator = payment.managerId as any;
       const paymentCreatorName =
@@ -474,7 +559,7 @@ export class PaymentConfirmationService extends PaymentBaseService {
       const confirmedActualAmount = payment.actualAmount || payment.amount;
       if (payment.paymentMethod !== PaymentMethod.FROM_ZAPAS) {
         await this.updateBalance(
-          payment.managerId.toString(),
+          managerIdBeforePopulate,
           {
             dollar: confirmedActualAmount,
             sum: 0,

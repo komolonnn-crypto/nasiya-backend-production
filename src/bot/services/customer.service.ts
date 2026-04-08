@@ -891,6 +891,7 @@ class CustomerService {
                 expectedAmount: "$$payment.expectedAmount",
                 targetMonth: "$$payment.targetMonth",
                 reminderDate: "$$payment.reminderDate",
+                excessHandling: "$$payment.excessHandling",
               },
             },
           },
