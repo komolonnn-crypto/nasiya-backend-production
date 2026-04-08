@@ -613,6 +613,8 @@ export class ContractQueryService {
                 notes: 1,
                 confirmedAt: 1,
                 confirmedBy: 1,
+                targetMonth: 1,
+                excessHandling: 1,
               },
             },
           ],
