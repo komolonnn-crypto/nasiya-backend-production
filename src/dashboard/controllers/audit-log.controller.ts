@@ -281,27 +281,8 @@ class AuditLogController {
         AuditLog.countDocuments(query),
       ]);
 
-      const activitiesWithContractId = activities.map((activity: any) => {
-        let contractId = activity.metadata?.contractId || null;
-
-        let customerId = null;
-        if (activity.metadata?.customerId) {
-          customerId = activity.metadata.customerId;
-        } else if (activity.entity === "customer" && activity.entityId) {
-          customerId = activity.entityId;
-        } else if (activity.metadata?.affectedEntities?.length) {
-          const customerEntity = activity.metadata.affectedEntities.find(
-            (e: any) => e.entityType === "customer",
-          );
-          if (customerEntity) customerId = customerEntity.entityId;
-        }
-
-        return {
-          ...activity,
-          contractId,
-          customerId,
-        };
-      });
+      const activitiesWithContractId =
+        await auditLogService.enrichAuditActivitiesForTable(activities);
 
       res.status(200).json({
         status: "success",

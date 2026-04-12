@@ -85,7 +85,7 @@ export class PaymentConfirmationService extends PaymentBaseService {
             : "Kassa";
           const now = new Date();
           const pad = (n: number) => n.toString().padStart(2, "0");
-          const confirmTime = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          const confirmTime = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
           const confirmedAmount = payment.actualAmount || payment.amount;
           const noteText = `Boshlang'ich to'lov to'landi $${confirmedAmount.toLocaleString()} — ${confirmerName} — ${confirmTime}`;
 
@@ -103,6 +103,55 @@ export class PaymentConfirmationService extends PaymentBaseService {
           logger.debug(`✅ Initial payment notes updated: "${noteText}"`);
         } catch (e) {
           logger.warn("⚠️ Could not update initial payment notes:", e);
+        }
+      }
+
+      if (payment.paymentType === PaymentType.MONTHLY) {
+        try {
+          const confirmer = await Employee.findById(user.sub);
+          const confirmerName =
+            confirmer ?
+              `${confirmer.firstName || ""} ${confirmer.lastName || ""}`.trim()
+            : "Kassa";
+
+          const creator = await Employee.findById(payment.managerId);
+          const creatorName =
+            creator ?
+              `${creator.firstName || ""} ${creator.lastName || ""}`.trim()
+            : "";
+
+          const now = payment.confirmedAt || new Date();
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          const confirmTime = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+          const confirmedAmount = payment.actualAmount ?? payment.amount;
+          const amtStr = Number(confirmedAmount).toLocaleString("en-US", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          });
+          const monthNum = payment.targetMonth ?? "?";
+
+          let noteText = `${monthNum}-oy to'lovi to'landi $${amtStr}`;
+          if (creatorName && confirmerName && creatorName !== confirmerName) {
+            noteText += ` — Yuborgan: ${creatorName} — Tasdiqlagan: ${confirmerName} — ${confirmTime}`;
+          } else {
+            noteText += ` — ${confirmerName || creatorName || "Kassa"} — ${confirmTime}`;
+          }
+
+          if (payment.notes) {
+            await Notes.findByIdAndUpdate(payment.notes, { text: noteText });
+          } else {
+            const newNote = await Notes.create({
+              text: noteText,
+              customer: payment.customerId,
+              createBy: user.sub,
+            });
+            payment.notes = newNote._id as any;
+            await payment.save();
+          }
+          logger.debug(`✅ Monthly payment notes updated: "${noteText}"`);
+        } catch (e) {
+          logger.warn("⚠️ Could not update monthly payment notes:", e);
         }
       }
 
@@ -571,6 +620,7 @@ export class PaymentConfirmationService extends PaymentBaseService {
             contractId: contract.customId,
             paymentType: payment.paymentType,
           },
+          { skipBalanceAudit: true },
         );
       }
 

@@ -175,11 +175,23 @@ class ContractService {
       }
       logger.debug("👤 Employee found:", createBy._id);
 
-      const customerDoc = await Customer.findById(customer);
+      const customerDoc = await Customer.findById(customer).populate({
+        path: "manager",
+        select: "firstName lastName",
+      });
       if (!customerDoc) {
         throw BaseError.NotFoundError("Mijoz topilmadi");
       }
       logger.debug("🤝 Customer found:", customerDoc._id);
+
+      const mgrDoc = (customerDoc as any).manager as
+        | { firstName?: string; lastName?: string }
+        | null
+        | undefined;
+      const managerNameForAudit =
+        mgrDoc?.firstName || mgrDoc?.lastName ?
+          `${mgrDoc.firstName || ""} ${mgrDoc.lastName || ""}`.trim()
+        : undefined;
 
       const newNotes = new Notes({
         text: notes || "Shartnoma yaratildi",
@@ -248,7 +260,8 @@ class ContractService {
         customerData.fullName,
         data.productName,
         data.totalPrice,
-        user.sub
+        user.sub,
+        managerNameForAudit ? { managerName: managerNameForAudit } : undefined,
       );
 
       const { PaymentCreatorHelper } = await import("../../utils/helpers/payment-creator.helper");

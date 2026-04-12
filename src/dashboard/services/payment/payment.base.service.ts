@@ -23,6 +23,8 @@ export class PaymentBaseService {
       contractId?: string;
       paymentType?: string;
     },
+    /** To'lov tasdiqlash kabi oqimlarda kassa balansi yangilanadi, lekin alohida "balans tahriri" audit kerak emas. */
+    options?: { skipBalanceAudit?: boolean },
   ): Promise<any> {
     try {
       let balance = await Balance.findOne({ managerId }).session(
@@ -53,7 +55,7 @@ export class PaymentBaseService {
         logger.debug("✅ Balance updated:", balance._id);
       }
 
-      if (userId) {
+      if (userId && !options?.skipBalanceAudit) {
         try {
           const Employee = (await import("../../../schemas/employee.schema"))
             .default;

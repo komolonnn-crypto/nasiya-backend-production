@@ -12,6 +12,7 @@ import Contract, { ContractStatus } from "../../schemas/contract.schema";
 import contractQueryService from "./contract/contract.query.service";
 import Customer from "../../schemas/customer.schema";
 import logger from "../../utils/logger";
+import dayjs from "dayjs";
 import { withTransaction } from "../../utils/transaction.wrapper";
 import {
   PAYMENT_CONSTANTS,
@@ -35,6 +36,21 @@ interface PaymentDto {
   };
   currencyCourse: number;
   paymentMethod?: string;
+}
+
+/** Admin / mini jadval bilan bir xil: 1-oy = initialPaymentDueDate yoki startDate+1 oy, keyingilari +1 oy. */
+function scheduledDueDateForTargetMonth(
+  contract: {
+    startDate: Date;
+    initialPaymentDueDate?: Date | null;
+  },
+  targetMonth: number,
+): Date {
+  const firstMonthlyBase =
+    contract.initialPaymentDueDate ?
+      dayjs(contract.initialPaymentDueDate)
+    : dayjs(contract.startDate).add(1, "month");
+  return firstMonthlyBase.add(targetMonth - 1, "month").toDate();
 }
 
 class PaymentService {
@@ -1191,12 +1207,10 @@ class PaymentService {
           createBy: String(manager._id),
         });
 
-        const contractStartDate = new Date(contract.startDate);
-        const originalDay =
-          contract.originalPaymentDay || contractStartDate.getDate();
-        const scheduledDate = new Date(contractStartDate);
-        scheduledDate.setMonth(contractStartDate.getMonth() + monthNumber);
-        scheduledDate.setDate(originalDay);
+        const scheduledDate = scheduledDueDateForTargetMonth(
+          contract,
+          monthNumber,
+        );
 
         const payment = await Payment.create({
           amount: monthlyPayment,
