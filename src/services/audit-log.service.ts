@@ -93,7 +93,12 @@ class AuditLogService {
     productName: string,
     totalPrice: number,
     userId: string,
-    metadata?: { source?: string; fileName?: string },
+    metadata?: {
+      source?: string;
+      fileName?: string;
+      /** Mijozga biriktirilgan menejer (ko‘rsatish uchun) */
+      managerName?: string;
+    },
   ): Promise<void> {
     await this.createLog({
       action: AuditAction.CREATE,
@@ -104,6 +109,8 @@ class AuditLogService {
         ...metadata,
         contractId,
         totalPrice,
+        amount: totalPrice,
+        managerName: metadata?.managerName,
         affectedEntities: [
           {
             entityType: "contract",
@@ -650,6 +657,146 @@ class AuditLogService {
     });
   }
 
+  /**
+   * Audit jadvali uchun: shartnoma `customId`, mijoz ObjectId va metadata yig‘indisi.
+   * `getDailyActivity` va `GET /audit/filter` ikkalasi ham shu metoddan foydalanadi.
+   */
+  async enrichAuditActivitiesForTable(activities: any[]): Promise<any[]> {
+    if (!activities.length) {
+      return [];
+    }
+
+    const contractIds = new Set<string>();
+
+    activities.forEach((activity: any) => {
+      if (activity.metadata?.contractId) {
+        contractIds.add(activity.metadata.contractId);
+      }
+      if (activity.entity === "contract" && activity.entityId) {
+        contractIds.add(activity.entityId);
+      }
+      if (activity.metadata?.affectedEntities?.length) {
+        activity.metadata.affectedEntities.forEach((e: any) => {
+          if (e.entityType === "contract" && e.entityId) {
+            contractIds.add(e.entityId);
+          }
+        });
+      }
+    });
+
+    const validContractIds = Array.from(contractIds).filter((id) => {
+      try {
+        return Types.ObjectId.isValid(id);
+      } catch {
+        return false;
+      }
+    });
+
+    let contractIdMap = new Map<string, string>();
+    let contractCustomerMap = new Map<string, string>();
+    let customIdToObjectIdMap = new Map<string, string>();
+
+    if (validContractIds.length > 0) {
+      try {
+        const contractQuery = Contract.find({
+          _id: { $in: validContractIds.map((id) => new Types.ObjectId(id)) },
+        }).select("_id customId customer");
+
+        const contracts: any = (await contractQuery.lean()) as any;
+
+        contracts.forEach((contract: any) => {
+          const objectId = contract._id.toString();
+          contractIdMap.set(objectId, contract.customId);
+          customIdToObjectIdMap.set(contract.customId, objectId);
+          if (contract.customer) {
+            contractCustomerMap.set(objectId, contract.customer.toString());
+          }
+        });
+      } catch (error) {
+        logger.error("❌ Error fetching contracts for customId:", error);
+      }
+    }
+
+    return activities.map((activity: any) => {
+      let contractId = activity.metadata?.contractId || null;
+
+      if (!contractId && activity.entity === "contract") {
+        contractId = activity.entityId || null;
+      }
+
+      if (!contractId && activity.metadata?.affectedEntities?.length) {
+        const contractEntity = activity.metadata.affectedEntities.find(
+          (e: any) => e.entityType === "contract",
+        );
+        if (contractEntity) contractId = contractEntity.entityId || null;
+      }
+
+      const customId = contractId ? contractIdMap.get(contractId) : null;
+
+      let customerId = null;
+
+      if (activity.metadata?.customerId) {
+        customerId = activity.metadata.customerId;
+      } else if (activity.entity === "customer" && activity.entityId) {
+        customerId = activity.entityId;
+      } else if (activity.metadata?.affectedEntities?.length) {
+        const customerEntity = activity.metadata.affectedEntities.find(
+          (e: any) => e.entityType === "customer",
+        );
+        if (customerEntity) customerId = customerEntity.entityId;
+      }
+
+      if (!customerId && contractId) {
+        customerId = contractCustomerMap.get(contractId) || null;
+
+        if (!customerId) {
+          const objectId = customIdToObjectIdMap.get(contractId);
+          if (objectId) {
+            customerId = contractCustomerMap.get(objectId) || null;
+          }
+        }
+      }
+
+      return {
+        _id: activity._id,
+        action: activity.action,
+        entity: activity.entity,
+        entityId: activity.entityId,
+        userId: activity.userId,
+        userType: activity.userType,
+        changes: activity.changes,
+        metadata:
+          activity.metadata ?
+            {
+              ...activity.metadata,
+
+              customerName:
+                activity.metadata.customerName ||
+                activity.metadata.affectedEntities?.find(
+                  (e: any) => e.entityType === "customer",
+                )?.entityName,
+              paymentCreatorName: activity.metadata.paymentCreatorName,
+              managerName: activity.metadata.managerName,
+              amount: activity.metadata.amount,
+              totalPrice: activity.metadata.totalPrice,
+              paymentType: activity.metadata.paymentType,
+              paymentStatus: activity.metadata.paymentStatus,
+              paymentMethod: activity.metadata.paymentMethod,
+              targetMonth: activity.metadata.targetMonth,
+              contractId: activity.metadata.contractId,
+            }
+          : undefined,
+        ipAddress: activity.ipAddress,
+        userAgent: activity.userAgent,
+        timestamp: activity.timestamp,
+        createdAt: activity.createdAt,
+        updatedAt: activity.updatedAt,
+        contractId: customId || contractId,
+        customerId,
+      };
+    });
+  }
+
   async getDailyActivity(
     date?: Date,
     limit: number = 100,
@@ -747,146 +894,8 @@ class AuditLogService {
       AuditLog.countDocuments(query),
     ]);
 
-    const contractIds = new Set<string>();
-    const customerIds = new Set<string>();
-
-    activities.forEach((activity: any) => {
-      if (activity.metadata?.contractId) {
-        contractIds.add(activity.metadata.contractId);
-      }
-      if (activity.entity === "contract" && activity.entityId) {
-        contractIds.add(activity.entityId);
-      }
-      if (activity.metadata?.affectedEntities?.length) {
-        activity.metadata.affectedEntities.forEach((e: any) => {
-          if (e.entityType === "contract" && e.entityId) {
-            contractIds.add(e.entityId);
-          }
-        });
-      }
-
-      if (activity.entity === "customer" && activity.entityId) {
-        customerIds.add(activity.entityId);
-      }
-      if (activity.metadata?.affectedEntities?.length) {
-        activity.metadata.affectedEntities.forEach((e: any) => {
-          if (e.entityType === "customer" && e.entityId) {
-            customerIds.add(e.entityId);
-          }
-        });
-      }
-    });
-
-    const validContractIds = Array.from(contractIds).filter((id) => {
-      try {
-        return Types.ObjectId.isValid(id);
-      } catch {
-        return false;
-      }
-    });
-
-    let contractIdMap = new Map<string, string>();
-    let contractCustomerMap = new Map<string, string>();
-    let customIdToObjectIdMap = new Map<string, string>();
-
-    if (validContractIds.length > 0) {
-      try {
-        // @ts-ignore - Complex Mongoose populate type
-        const contractQuery = Contract.find({
-          _id: { $in: validContractIds.map((id) => new Types.ObjectId(id)) },
-        }).select("_id customId customer");
-
-        const contracts: any = (await contractQuery.lean()) as any;
-
-        contracts.forEach((contract: any) => {
-          const objectId = contract._id.toString();
-          contractIdMap.set(objectId, contract.customId);
-          customIdToObjectIdMap.set(contract.customId, objectId);
-          if (contract.customer) {
-            contractCustomerMap.set(objectId, contract.customer.toString());
-          }
-        });
-      } catch (error) {
-        logger.error("❌ Error fetching contracts for customId:", error);
-      }
-    }
-
-    const activitiesWithContractId = activities.map((activity: any) => {
-      let contractId = activity.metadata?.contractId || null;
-
-      if (!contractId && activity.entity === "contract") {
-        contractId = activity.entityId || null;
-      }
-
-      if (!contractId && activity.metadata?.affectedEntities?.length) {
-        const contractEntity = activity.metadata.affectedEntities.find(
-          (e: any) => e.entityType === "contract",
-        );
-        if (contractEntity) contractId = contractEntity.entityId || null;
-      }
-
-      const customId = contractId ? contractIdMap.get(contractId) : null;
-
-      let customerId = null;
-
-      if (activity.metadata?.customerId) {
-        customerId = activity.metadata.customerId;
-      } else if (activity.entity === "customer" && activity.entityId) {
-        customerId = activity.entityId;
-      } else if (activity.metadata?.affectedEntities?.length) {
-        const customerEntity = activity.metadata.affectedEntities.find(
-          (e: any) => e.entityType === "customer",
-        );
-        if (customerEntity) customerId = customerEntity.entityId;
-      }
-
-      if (!customerId && contractId) {
-        customerId = contractCustomerMap.get(contractId) || null;
-
-        if (!customerId) {
-          const objectId = customIdToObjectIdMap.get(contractId);
-          if (objectId) {
-            customerId = contractCustomerMap.get(objectId) || null;
-          }
-        }
-      }
-
-      return {
-        _id: activity._id,
-        action: activity.action,
-        entity: activity.entity,
-        entityId: activity.entityId,
-        userId: activity.userId,
-        userType: activity.userType,
-        changes: activity.changes,
-        metadata:
-          activity.metadata ?
-            {
-              ...activity.metadata,
-
-              customerName:
-                activity.metadata.customerName ||
-                activity.metadata.affectedEntities?.find(
-                  (e: any) => e.entityType === "customer",
-                )?.entityName,
-              paymentCreatorName: activity.metadata.paymentCreatorName,
-              amount: activity.metadata.amount,
-              paymentType: activity.metadata.paymentType,
-              paymentStatus: activity.metadata.paymentStatus,
-              paymentMethod: activity.metadata.paymentMethod,
-              targetMonth: activity.metadata.targetMonth,
-              contractId: activity.metadata.contractId,
-            }
-          : undefined,
-        ipAddress: activity.ipAddress,
-        userAgent: activity.userAgent,
-        timestamp: activity.timestamp,
-        createdAt: activity.createdAt,
-        updatedAt: activity.updatedAt,
-        contractId: customId || contractId,
-        customerId,
-      };
-    });
+    const activitiesWithContractId =
+      await this.enrichAuditActivitiesForTable(activities);
 
     return { activities: activitiesWithContractId, total };
   }
